@@ -51,6 +51,18 @@ func (r *IndexerRepository) FindByEnabled(ctx context.Context) ([]entity.Indexer
 	return indexers, nil
 }
 
+func (r *IndexerRepository) FindAllIndexers(ctx context.Context) ([]entity.Indexer, error) {
+	var indexers []entity.Indexer
+	// hate that the lint doesn't like the '.' on the new line
+	err := r.db.WithContext(ctx).Order("name ASC").
+		Find(&indexers).Error
+
+	if err != nil {
+		return nil, err
+	}
+	return indexers, nil
+}
+
 func (r *IndexerRepository) SaveIndexer(ctx context.Context, indexer *entity.Indexer) error {
 	if indexer == nil {
 		return fmt.Errorf("indexer is nil")
