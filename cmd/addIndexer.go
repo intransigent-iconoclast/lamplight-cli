@@ -4,8 +4,7 @@ Copyright © 2025 NAME HERE <EMAIL ADDRESS>
 package cmd
 
 import (
-	"context"
-	"log"
+	"fmt"
 	"strings"
 
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
@@ -46,26 +45,26 @@ Examples:
     -t TORZNAB
 
 After adding an indexer, other commands can use it to run searches.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		// validate inputs before spinning up any db
 		name, err := cmd.Flags().GetString("name")
 		if err != nil {
-			log.Fatalf("get flag 'name': %v", err)
+			return fmt.Errorf("get flag 'name': %w", err)
 		}
 
-		baseUrl, err := cmd.Flags().GetString("base-url")
+		baseURL, err := cmd.Flags().GetString("base-url")
 		if err != nil {
-			log.Fatalf("get flag 'base-url': %v", err)
+			return fmt.Errorf("get flag 'base-url': %w", err)
 		}
 
 		apiKey, err := cmd.Flags().GetString("api-key")
 		if err != nil {
-			log.Fatalf("get flag 'api-key': %v", err)
+			return fmt.Errorf("get flag 'api-key': %w", err)
 		}
 
 		rawType, err := cmd.Flags().GetString("indexer-type")
 		if err != nil {
-			log.Fatalf("get flag 'indexer-type': %v", err)
+			return fmt.Errorf("get flag 'indexer-type': %w", err)
 		}
 
 		// normalize + map string → enum
@@ -76,16 +75,16 @@ After adding an indexer, other commands can use it to run searches.`,
 		case string(entity.IndexerTypeTorznab):
 			idxType = entity.IndexerTypeTorznab
 		default:
-			log.Fatalf("unsupported indexer type %q; valid types: %s",
+			return fmt.Errorf("unsupported indexer type %q; valid types: %s",
 				rawType, string(entity.IndexerTypeTorznab))
 		}
-		// now open db if there was no error
-		ctx := context.Background()
 
-		// disable this toggle later...
+		// use command context so it's cancellable if needed
+		ctx := cmd.Context()
+
 		db, err := utils.Open("lamplight-cli", false)
 		if err != nil {
-			log.Fatalf("open db: %v", err)
+			return fmt.Errorf("open db: %w", err)
 		}
 
 		repo := repository.NewIndexerRepository(db)
@@ -93,15 +92,18 @@ After adding an indexer, other commands can use it to run searches.`,
 		// construct the thing to save ..
 		idx := entity.Indexer{
 			Name:        name,
-			BaseURL:     baseUrl,
+			BaseURL:     baseURL,
 			APIKey:      apiKey,
 			IndexerType: idxType,
 			Enabled:     true,
 		}
 
 		if err := repo.SaveIndexer(ctx, &idx); err != nil {
-			log.Fatalf("Error: Indexer was not saved %v", err)
+			return fmt.Errorf("save indexer: %w", err)
 		}
+
+		fmt.Fprintf(cmd.OutOrStdout(), "Added indexer %q (id=%d)\n", idx.Name, idx.ID)
+		return nil
 
 	},
 }
@@ -116,14 +118,4 @@ func init() {
 
 	addIndexerCmd.MarkFlagRequired("name")
 	addIndexerCmd.MarkFlagRequired("base-url")
-
-	// Here you will define your flags and configuration settings.
-
-	// Cobra supports Persistent Flags which will work for this command
-	// and all subcommands, e.g.:
-	// addIndexerCmd.PersistentFlags().String("foo", "", "A help for foo")
-
-	// Cobra supports local flags which will only run when this command
-	// is called directly, e.g.:
-	// addIndexerCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 }

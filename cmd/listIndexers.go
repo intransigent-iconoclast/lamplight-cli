@@ -5,7 +5,6 @@ package cmd
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"text/tabwriter"
 
@@ -44,31 +43,31 @@ Examples:
 
 You can use the INDEX column when building future commands (e.g. update or
 delete) to refer to a specific indexer without having to retype its name.`,
-	Run: func(cmd *cobra.Command, args []string) {
+	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
 		db, err := utils.Open("lamplight-cli", false)
 		if err != nil {
-			log.Fatalf("open db: %v", err)
+			return fmt.Errorf("open db: %w", err)
 		}
 
 		repo := repository.NewIndexerRepository(db)
 
 		indexers, err := repo.FindAllIndexers(ctx)
 		if err != nil {
-			log.Fatalf("list indexers: %v", err)
+			return fmt.Errorf("list indexers: %w", err)
 		}
 
 		out := cmd.OutOrStdout()
 
 		if len(indexers) == 0 {
 			fmt.Fprintln(out, "No indexers found. Use 'lamplight indexer add' to add one.")
-			return
+			return nil
 		}
 
 		showAPIKey, err := cmd.Flags().GetBool("safe")
 		if err != nil {
-			log.Fatalf("get flag 'safe': %v", err)
+			return fmt.Errorf("get flag 'safe': %w", err)
 		}
 
 		w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
@@ -111,8 +110,10 @@ delete) to refer to a specific indexer without having to retype its name.`,
 		}
 
 		if err := w.Flush(); err != nil {
-			log.Fatalf("flush writer: %v", err)
+			return fmt.Errorf("flush writer: %w", err)
 		}
+
+		return nil
 	},
 }
 
