@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 
@@ -76,4 +77,17 @@ func (r *IndexerRepository) SaveIndexer(ctx context.Context, indexer *entity.Ind
 		return fmt.Errorf("create indexer: %w", err)
 	}
 	return nil
+}
+
+func (r *IndexerRepository) DeleteIndexerById(ctx context.Context, id uint) error {
+	result := r.db.WithContext(ctx).Delete(&entity.Indexer{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	// if no rows were modified this item should be emitted
+	if result.RowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+
 }
