@@ -16,6 +16,7 @@ type Indexer struct {
 	APIKey      string      `gorm:"size:255"`
 	IndexerType IndexerType `gorm:"size:50;not null"`
 	Enabled     bool        `gorm:"not null;default:true"`
+	Priority    int         `gorm:"not null;default:42"`
 }
 
 func (Indexer) TableName() string {

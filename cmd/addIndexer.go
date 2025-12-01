@@ -83,7 +83,7 @@ After adding an indexer, other commands can use it to run searches.`,
 		ctx := context.Background()
 
 		// disable this toggle later...
-		db, err := utils.Open("lamplight-cli", true)
+		db, err := utils.Open("lamplight-cli", false)
 		if err != nil {
 			log.Fatalf("open db: %v", err)
 		}

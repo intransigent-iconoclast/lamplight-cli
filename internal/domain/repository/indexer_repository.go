@@ -54,7 +54,7 @@ func (r *IndexerRepository) FindByEnabled(ctx context.Context) ([]entity.Indexer
 func (r *IndexerRepository) FindAllIndexers(ctx context.Context) ([]entity.Indexer, error) {
 	var indexers []entity.Indexer
 	// hate that the lint doesn't like the '.' on the new line
-	err := r.db.WithContext(ctx).Order("name ASC").
+	err := r.db.WithContext(ctx).Order("id ASC").
 		Find(&indexers).Error
 
 	if err != nil {
