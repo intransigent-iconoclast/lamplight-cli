@@ -6,5 +6,5 @@ type SearchRequest struct {
 	Title       string
 	ISBN        string
 	IndexerName string
-	Limit       int
+	Limit       int // default maybe -1 idk for now lets roll with it
 }

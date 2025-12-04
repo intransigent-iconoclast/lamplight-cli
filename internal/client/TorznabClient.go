@@ -12,19 +12,20 @@ import (
 )
 
 type TorznabClient struct {
-	client *http.Client
+	Client *http.Client
 }
 
 func NewTorznabClient(client *http.Client) *TorznabClient {
+	// log.Println("MADE IT HERE ")
 	if client == nil {
 		client = http.DefaultClient
 	}
 	return &TorznabClient{
-		client: client,
+		Client: client,
 	}
 }
 
-func (client *TorznabClient) fetch(ctx context.Context, query utils.TorznabQuery, indexer entity.Indexer) (string, error) {
+func (client *TorznabClient) Fetch(ctx context.Context, query utils.TorznabQuery, indexer entity.Indexer) (string, error) {
 	params := query.ToParams(indexer.APIKey)
 
 	u, err := url.Parse(indexer.BaseURL)
@@ -32,21 +33,22 @@ func (client *TorznabClient) fetch(ctx context.Context, query utils.TorznabQuery
 		return "", fmt.Errorf("invalid base URL %q: %w", indexer.BaseURL, err)
 	}
 
+	// so raw
 	u.RawQuery = params.Encode()
+	// log.Println("Query string: %s", u.RawQuery)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
 		return "", fmt.Errorf("create request: %w", err)
 	}
 
-	resp, err := client.client.Do(req)
+	resp, err := client.Client.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("perform request: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		// you could read body for more detail here if you want
 		return "", fmt.Errorf("unexpected status: %s", resp.Status)
 	}
 

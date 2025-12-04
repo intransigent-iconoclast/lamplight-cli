@@ -12,18 +12,17 @@ type SearchType string
 const (
 	// name type = value
 	SEARCH SearchType = "search"
-	BOOK   SearchType = "book"
+	// BOOK   SearchType = "book"
 )
 
 type TorznabQuery struct {
 	SearchType SearchType
+	Author     string
+	Categories []int
+	Isbn       string
+	Limit      *int // * makes them optional somehow when they're pointers
 	Query      string
 	Title      string
-	Author     string
-	Isbn       string
-	Categories []int
-	Limit      *int // * makes them optional somehow when they're pointers
-	Offset     *int
 }
 
 func NewTorznabQuery() TorznabQuery {
@@ -80,8 +79,8 @@ func (q TorznabQuery) ToParams(apiKey string) url.Values {
 	if q.Limit != nil {
 		params.Set("limit", strconv.Itoa(*q.Limit))
 	}
-	if q.Offset != nil {
-		params.Set("offset", strconv.Itoa(*q.Offset))
-	}
+	// if q.Offset != nil {
+	// 	params.Set("offset", strconv.Itoa(*q.Offset))
+	// }
 	return params
 }

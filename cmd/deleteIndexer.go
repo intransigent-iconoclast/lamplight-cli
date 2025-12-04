@@ -32,7 +32,6 @@ var deleteIndexerCmd = &cobra.Command{
 
 		if count == 0 {
 			// show help and exit with an error
-			_ = cmd.Usage()
 			return fmt.Errorf("you must specify exactly one of --index or --name")
 		}
 		if count > 1 {

@@ -11,16 +11,16 @@ import (
 
 // type definition
 type SearchService struct {
-	indexerRepository repository.IndexerRepository
+	indexerRepository *repository.IndexerRepository
 	searchBackends    []SearchBackend
 }
 
-// constructor ... ugly but true/
+// constructor ... ugly but true.
 // within () required params to construct type, and *SearchService is
 // how structs are passed around in go is usually as pointers so that we arent' coppying structs around
 // this is just how go creates structs :shrug:
 func NewSearchService(
-	indexerRepository repository.IndexerRepository,
+	indexerRepository *repository.IndexerRepository,
 	searchBackends []SearchBackend,
 ) *SearchService {
 	return &SearchService{
@@ -30,45 +30,45 @@ func NewSearchService(
 }
 
 func (s *SearchService) Search(ctx context.Context, request dao.SearchRequest) ([]dao.SearchResult, error) {
-	targets, err := s.resolveIndexers(ctx, request)
+	// resolve which indexers to hit (by name or all enabled)
+	indexers, err := s.getIndexers(ctx, request)
 	if err != nil {
 		return nil, err
 	}
 
+	if len(indexers) == 0 {
+		return []dao.SearchResult{}, nil
+	}
+
 	var all []dao.SearchResult
-	for _, idx := range targets {
+
+	// for each indexer, pick a backend and call it!
+	var lastErr error
+	for _, idx := range indexers {
 		backend, err := s.resolveBackend(idx.IndexerType)
+		// busted af just skip this one ... probably log this so user knows I'm never gonna use this ... not even sure how this would happen but
 		if err != nil {
-			return nil, err
+			lastErr = fmt.Errorf("no backend for indexer %q (type=%s): %w", idx.Name, idx.IndexerType, err)
+			continue
 		}
+
 		results, err := backend.Search(ctx, idx, request)
 		if err != nil {
-			return nil, err
+			// no results found skiiiip
+			lastErr = fmt.Errorf("search with indexer %q (id=%d): %w", idx.Name, idx.ID, err)
+			continue
 		}
+
 		all = append(all, results...)
 	}
 
-	// TODO: extra filtering on all based on req fields maybe later
-	return all, nil
-}
-
-// perhaps revisit the design of this one right here ...
-func (s *SearchService) resolveIndexers(ctx context.Context, request dao.SearchRequest) ([]entity.Indexer, error) {
-	if request.IndexerName != "" {
-		indexers, err := s.indexerRepository.FindByName(ctx, request.IndexerName)
-		// was error
-		if err != nil {
-			return nil, err
-		}
-		// no indexers found return empty list
-		if indexers == nil {
-			return []entity.Indexer{}, nil
-		}
-		// found results
-		return []entity.Indexer{*indexers}, nil
+	// everything failed not sure if this is a good idea or not but :shrug
+	if len(all) == 0 && lastErr != nil {
+		return nil, lastErr
 	}
-	// if all else fails... just return indexers that are enabled
-	return s.indexerRepository.FindByEnabled(ctx)
+
+	// some results came back
+	return all, nil
 }
 
 // picks A backend that supports the requested indexer type
@@ -78,5 +78,28 @@ func (s *SearchService) resolveBackend(indexerType entity.IndexerType) (SearchBa
 			return b, nil
 		}
 	}
-	return nil, fmt.Errorf("No backend for type: %s", indexerType)
+	return nil, fmt.Errorf("no backend for type: %s", indexerType)
+}
+
+func (s *SearchService) getIndexers(ctx context.Context, request dao.SearchRequest) ([]entity.Indexer, error) {
+	// Specific indexer requested by name: return at most one.
+
+	if request.IndexerName != "" {
+		indexer, err := s.indexerRepository.FindByName(ctx, request.IndexerName)
+		if err != nil {
+			return nil, err
+		}
+		if indexer == nil {
+			// No such indexer; treat as "no targets".
+			return []entity.Indexer{}, nil
+		}
+		return []entity.Indexer{*indexer}, nil
+	}
+
+	// No indexer specified: use all enabled.
+	indexers, err := s.indexerRepository.FindByEnabled(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return indexers, nil
 }

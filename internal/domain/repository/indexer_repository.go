@@ -43,12 +43,13 @@ func (r *IndexerRepository) FindByEnabled(ctx context.Context) ([]entity.Indexer
 	var indexers []entity.Indexer
 	err := r.db.WithContext(ctx).
 		Where("enabled = ?", true).
-		// find without limit finds all
 		Find(&indexers).
 		Error
+
 	if err != nil {
 		return nil, err
 	}
+	// fmt.Printf("%+v\n", indexers)
 	return indexers, nil
 }
 
@@ -84,10 +85,20 @@ func (r *IndexerRepository) DeleteIndexerById(ctx context.Context, id uint) erro
 	if result.Error != nil {
 		return result.Error
 	}
-	// if no rows were modified this item should be emitted
+	// if no rows were modified this item should be emitted ... might refactor cuz
 	if result.RowsAffected == 0 {
 		return sql.ErrNoRows
 	}
 	return nil
 
 }
+
+// func (r *IndexerRepository) DumpAll(ctx context.Context) error {
+// 	var idxs []entity.Indexer
+// 	err := r.db.WithContext(ctx).Debug().Find(&idxs).Error
+// 	if err != nil {
+// 		return err
+// 	}
+// 	fmt.Printf("ALL INDEXERS FROM GO: %#v\n", idxs)
+// 	return nil
+// }
