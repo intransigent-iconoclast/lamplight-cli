@@ -38,18 +38,9 @@ func (b *TorznabBackend) Search(ctx context.Context, indexer entity.Indexer, req
 
 func (b *TorznabBackend) constructQueryFromRequest(request *dao.SearchRequest) utils.TorznabQuery {
 	query := utils.NewTorznabQuery()
-	if request.Author != "" {
-		query.Author = request.Author
-	}
-	if request.ISBN != "" {
-		query.Isbn = request.ISBN
-	}
 	if request.Limit > 0 {
 		limit := request.Limit
 		query.Limit = &limit
-	}
-	if request.Title != "" {
-		query.Title = request.Title
 	}
 	if request.Query != "" {
 		query.Query = request.Query

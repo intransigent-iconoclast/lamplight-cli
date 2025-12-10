@@ -89,6 +89,7 @@ func ParseTorznabXml(xmlStr string) ([]dao.SearchResult, error) {
 			SizeBytes:   sizeBytes,
 			Seeders:     seeders,
 			Leechers:    leechers,
+			Categories:  it.Categories,
 		})
 	}
 

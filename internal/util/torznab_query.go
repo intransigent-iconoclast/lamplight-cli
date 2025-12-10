@@ -17,12 +17,12 @@ const (
 
 type TorznabQuery struct {
 	SearchType SearchType
-	Author     string
+	// Author     string
 	Categories []int
-	Isbn       string
-	Limit      *int // * makes them optional somehow when they're pointers
-	Query      string
-	Title      string
+	// Isbn       string
+	Limit *int // * makes them optional somehow when they're pointers
+	Query string
+	// Title      string
 }
 
 func NewTorznabQuery() TorznabQuery {
@@ -45,15 +45,15 @@ func (q TorznabQuery) ToParams(apiKey string) url.Values {
 	if s := strings.TrimSpace(q.Query); s != "" {
 		params.Set("q", s)
 	}
-	if s := strings.TrimSpace(q.Title); s != "" {
-		params.Set("title", s)
-	}
-	if s := strings.TrimSpace(q.Author); s != "" {
-		params.Set("author", s)
-	}
-	if s := strings.TrimSpace(q.Isbn); s != "" {
-		params.Set("isbn", s)
-	}
+	// if s := strings.TrimSpace(q.Title); s != "" {
+	// 	params.Set("title", s)
+	// }
+	// if s := strings.TrimSpace(q.Author); s != "" {
+	// 	params.Set("author", s)
+	// }
+	// if s := strings.TrimSpace(q.Isbn); s != "" {
+	// 	params.Set("isbn", s)
+	// }
 
 	if len(q.Categories) > 0 {
 		// this is a neat go thing chatgpt taught me this is a set constructed from a map

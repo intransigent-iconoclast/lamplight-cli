@@ -29,7 +29,7 @@ func NewSearchService(
 	}
 }
 
-func (s *SearchService) Search(ctx context.Context, request dao.SearchRequest) ([]dao.SearchResult, error) {
+func (s *SearchService) Search(ctx context.Context, request dao.SearchRequest, criteria dao.FilterCriteria) ([]dao.SearchResult, error) {
 	// resolve which indexers to hit (by name or all enabled)
 	indexers, err := s.getIndexers(ctx, request)
 	if err != nil {
@@ -67,8 +67,11 @@ func (s *SearchService) Search(ctx context.Context, request dao.SearchRequest) (
 		return nil, lastErr
 	}
 
+	// filtering!!!
+	filteredHits := FilterResults(all, criteria)
+
 	// some results came back
-	return all, nil
+	return filteredHits, nil
 }
 
 // picks A backend that supports the requested indexer type

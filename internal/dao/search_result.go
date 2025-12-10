@@ -7,4 +7,5 @@ type SearchResult struct {
 	SizeBytes   *int64 // * somehow makes this an optional
 	Seeders     *int
 	Leechers    *int
+	Categories  []int
 }
