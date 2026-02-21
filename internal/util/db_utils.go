@@ -64,12 +64,20 @@ func Open(appName string, dropSchema bool) (*gorm.DB, error) {
 
 	// wipes db which is no goooood if i'm releasing this
 	if dropSchema {
-		if err := db.Migrator().DropTable(&entity.Indexer{}); err != nil {
+		if err := db.Migrator().DropTable(&entity.Downloader{}); err != nil {
 			return nil, fmt.Errorf("drop schema: %w", err)
 		}
 	}
 
 	if err := db.AutoMigrate(&entity.Indexer{}); err != nil {
+		return nil, fmt.Errorf("migrate schema: %w", err)
+	}
+
+	if err := db.AutoMigrate(&entity.Downloader{}); err != nil {
+		return nil, fmt.Errorf("migrate schema: %w", err)
+	}
+
+	if err := db.AutoMigrate(&entity.SearchCache{}); err != nil {
 		return nil, fmt.Errorf("migrate schema: %w", err)
 	}
 

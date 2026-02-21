@@ -46,7 +46,7 @@ Examples:
 
 After adding an indexer, other commands can use it to run searches.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// validate inputs before spinning up any db
+		// TODO: Validate this later
 		name, err := cmd.Flags().GetString("name")
 		if err != nil {
 			return fmt.Errorf("get flag 'name': %w", err)

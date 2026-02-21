@@ -70,6 +70,10 @@ func (s *SearchService) Search(ctx context.Context, request dao.SearchRequest, c
 	// filtering!!!
 	filteredHits := FilterResults(all, criteria)
 
+	if request.Limit > 0 && len(filteredHits) > request.Limit {
+		filteredHits = filteredHits[:request.Limit]
+	}
+
 	// some results came back
 	return filteredHits, nil
 }

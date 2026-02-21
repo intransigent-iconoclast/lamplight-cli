@@ -5,9 +5,9 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
-	"text/tabwriter"
+	"strconv"
 
+	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
 	utils "github.com/intransigent-iconoclast/lamplight-cli/internal/util"
 	"github.com/spf13/cobra"
@@ -60,57 +60,48 @@ delete) to refer to a specific indexer without having to retype its name.`,
 
 		out := cmd.OutOrStdout()
 
+		unsafe, err := cmd.Flags().GetBool("unsafe")
+		if err != nil {
+			return fmt.Errorf("get flag: 'unsafe': %w", err)
+		}
+
 		if len(indexers) == 0 {
 			fmt.Fprintln(out, "No indexers found. Use 'lamplight indexer add' to add one.")
 			return nil
 		}
 
-		showAPIKey, err := cmd.Flags().GetBool("safe")
-		if err != nil {
-			return fmt.Errorf("get flag 'safe': %w", err)
-		}
-
-		w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-
-		// Header row
-		if showAPIKey {
-			fmt.Fprintln(w, "INDEX\tNAME\tPRIORITY\tTYPE\tENABLED\tBASE_URL\tAPI_KEY")
-		} else {
-			fmt.Fprintln(w, "INDEX\tNAME\tPRIORITY\tTYPE\tENABLED\tBASE_URL")
-		}
-
-		// Rows (INDEX is 0-based so you can map directly to slice index if you want)
-		for i, idx := range indexers {
-			enabled := "no"
-			if idx.Enabled {
-				enabled = "yes"
-			}
-			baseURL := strings.TrimSpace(idx.BaseURL)
-
-			if showAPIKey {
-				fmt.Fprintf(w, "%d\t%s\t%d\t%s\t%s\t%s\t%s\n",
-					i,
-					idx.Name,
-					idx.Priority,
-					string(idx.IndexerType),
-					enabled,
-					baseURL,
-					strings.TrimSpace(idx.APIKey),
-				)
-			} else {
-				fmt.Fprintf(w, "%d\t%s\t%d\t%s\t%s\t%s\n",
-					i,
-					idx.Name,
-					idx.Priority,
-					string(idx.IndexerType),
-					enabled,
-					baseURL,
-				)
-			}
-		}
-
-		if err := w.Flush(); err != nil {
-			return fmt.Errorf("flush writer: %w", err)
+		switch unsafe {
+		case false:
+			utils.PrintOutput(
+				out,
+				string(utils.INDEXER_SAFE),
+				indexers,
+				func(i entity.Indexer) []string {
+					return []string{
+						i.Name,
+						i.BaseURL,
+						string(i.IndexerType),
+						strconv.FormatBool(i.Enabled),
+						strconv.Itoa(i.Priority),
+					}
+				},
+			)
+		default:
+			utils.PrintOutput(
+				out,
+				string(utils.INDEXER_UNSAFE),
+				indexers,
+				func(i entity.Indexer) []string {
+					return []string{
+						i.Name,
+						i.BaseURL,
+						string(i.IndexerType),
+						strconv.FormatBool(i.Enabled),
+						i.APIKey,
+						strconv.Itoa(i.Priority),
+					}
+				},
+			)
 		}
 
 		return nil
@@ -120,5 +111,5 @@ delete) to refer to a specific indexer without having to retype its name.`,
 func init() {
 	indexerCmd.AddCommand(listIndexersCmd)
 
-	listIndexersCmd.Flags().BoolP("safe", "s", false, "Will include the api key in output.")
+	listIndexersCmd.Flags().BoolP("unsafe", "u", false, "Inclusion of this flag prints passwords.")
 }
