@@ -31,7 +31,14 @@ go.work.sum
 # .idea/
 # .vscode/
 
-target
+target/
 *.log
 
+# test scripts
 scripts/smoke-test.sh
+scripts/test-organize.sh
+
+# sqlite db files
+*.db.sqlite
+*.db.sqlite-shm
+*.db.sqlite-wal

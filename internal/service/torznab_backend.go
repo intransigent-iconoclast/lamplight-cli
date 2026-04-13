@@ -33,6 +33,10 @@ func (b *TorznabBackend) Search(ctx context.Context, indexer entity.Indexer, req
 	if err != nil {
 		return []dao.SearchResult{}, err
 	}
+	for i := range res {
+		res[i].IndexerName = indexer.Name
+		res[i].Format = string(utils.DetectFormat(res[i].FormatAttr, res[i].Categories, res[i].Title))
+	}
 	return res, nil
 }
 

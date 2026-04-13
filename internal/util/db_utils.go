@@ -81,5 +81,17 @@ func Open(appName string, dropSchema bool) (*gorm.DB, error) {
 		return nil, fmt.Errorf("migrate schema: %w", err)
 	}
 
+	if err := db.AutoMigrate(&entity.Provider{}); err != nil {
+		return nil, fmt.Errorf("migrate schema: %w", err)
+	}
+
+	if err := db.AutoMigrate(&entity.DownloadHistory{}); err != nil {
+		return nil, fmt.Errorf("migrate schema: %w", err)
+	}
+
+	if err := db.AutoMigrate(&entity.LibraryConfig{}); err != nil {
+		return nil, fmt.Errorf("migrate schema: %w", err)
+	}
+
 	return db, nil
 }

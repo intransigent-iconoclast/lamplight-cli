@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -29,6 +30,8 @@ var searchCmd = &cobra.Command{
 		indexer, _ := cmd.Flags().GetInt("indexer")
 		limit, _ := cmd.Flags().GetInt("limit")
 		books, _ := cmd.Flags().GetBool("books")
+		sortBy, _ := cmd.Flags().GetString("sort")
+		formatFilter, _ := cmd.Flags().GetString("type")
 
 		var searchRequest dao.SearchRequest
 		searchRequest.Query = query
@@ -76,6 +79,71 @@ var searchCmd = &cobra.Command{
 			return fmt.Errorf("search: %w", err)
 		}
 
+		// Filter by format/type if requested ("all" anywhere in the list skips filtering)
+		if formatFilter != "" {
+			types := strings.Split(strings.ToLower(strings.TrimSpace(formatFilter)), ",")
+			hasAll := false
+			for _, t := range types {
+				if strings.TrimSpace(t) == "all" {
+					hasAll = true
+					break
+				}
+			}
+			if !hasAll {
+				var filtered []dao.SearchResult
+				for _, r := range res {
+					for _, t := range types {
+						if matchesTypeFilter(r.Format, strings.TrimSpace(t)) {
+							filtered = append(filtered, r)
+							break
+						}
+					}
+				}
+				res = filtered
+			}
+		}
+
+		// Sort results
+		switch strings.ToLower(sortBy) {
+		case "seeders":
+			sort.SliceStable(res, func(i, j int) bool {
+				si, sj := 0, 0
+				if res[i].Seeders != nil {
+					si = *res[i].Seeders
+				}
+				if res[j].Seeders != nil {
+					sj = *res[j].Seeders
+				}
+				return si > sj
+			})
+		case "leechers":
+			sort.SliceStable(res, func(i, j int) bool {
+				li, lj := 0, 0
+				if res[i].Leechers != nil {
+					li = *res[i].Leechers
+				}
+				if res[j].Leechers != nil {
+					lj = *res[j].Leechers
+				}
+				return li > lj
+			})
+		case "size":
+			sort.SliceStable(res, func(i, j int) bool {
+				si, sj := int64(0), int64(0)
+				if res[i].SizeBytes != nil {
+					si = *res[i].SizeBytes
+				}
+				if res[j].SizeBytes != nil {
+					sj = *res[j].SizeBytes
+				}
+				return si > sj
+			})
+		case "title":
+			sort.SliceStable(res, func(i, j int) bool {
+				return strings.ToLower(res[i].Title) < strings.ToLower(res[j].Title)
+			})
+		}
+
 		out := cmd.OutOrStdout()
 
 		if len(res) == 0 {
@@ -83,14 +151,37 @@ var searchCmd = &cobra.Command{
 			return nil
 		}
 
+		// non-title columns take ~68 chars, title gets the rest (min 20, max 80)
+		termW := utils.TerminalWidth()
+		titleMax := termW - 68
+		if titleMax < 20 {
+			titleMax = 20
+		}
+		if titleMax > 80 {
+			titleMax = 80
+		}
+
 		utils.PrintOutput(out, string(utils.SEARCH_RESULTS), res,
 			func(d dao.SearchResult) []string {
+				size := "?"
+				if d.SizeBytes != nil {
+					size = utils.BytesToMb(int(*d.SizeBytes))
+				}
+				seeders := "?"
+				if d.Seeders != nil {
+					seeders = strconv.Itoa(*d.Seeders)
+				}
+				leechers := "?"
+				if d.Leechers != nil {
+					leechers = strconv.Itoa(*d.Leechers)
+				}
 				return []string{
-					utils.CleanString(d.Title),
-					d.IndexerName,
-					utils.BytesToMb(int(*d.SizeBytes)),
-					strconv.Itoa(*d.Seeders),
-					strconv.Itoa(*d.Seeders),
+					utils.SmartTruncate(utils.CleanString(d.Title), titleMax),
+					d.Format,
+					utils.CleanIndexerName(d.IndexerName),
+					size,
+					seeders,
+					leechers,
 				}
 			})
 
@@ -104,10 +195,24 @@ var searchCmd = &cobra.Command{
 	},
 }
 
+// matchesTypeFilter maps content-type aliases to the detected format values.
+// "book" and "ebook" catch any prose format (epub/pdf/mobi).
+// Specific formats (epub, pdf, mobi, audiobook, comic) still work as before.
+func matchesTypeFilter(format, filter string) bool {
+	switch filter {
+	case "book", "ebook":
+		return format == "epub" || format == "pdf" || format == "mobi"
+	default:
+		return format == filter
+	}
+}
+
 func init() {
 	rootCmd.AddCommand(searchCmd)
 
 	searchCmd.Flags().IntP("indexer", "i", -1, "Search using a specific indexer.")
 	searchCmd.Flags().IntP("limit", "l", 15, "Maximum number of items to return.")
 	searchCmd.Flags().BoolP("books", "b", true, "Filter by book categories (default true).")
+	searchCmd.Flags().StringP("sort", "s", "seeders", "Sort results by: seeders, leechers, size, title.")
+	searchCmd.Flags().StringP("type", "t", "", "Filter by type: all, book (epub/pdf/mobi), audiobook, comic, epub, pdf, mobi, unknown.")
 }

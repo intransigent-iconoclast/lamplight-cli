@@ -9,6 +9,7 @@ import (
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
 	utils "github.com/intransigent-iconoclast/lamplight-cli/internal/util"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // type definition
@@ -18,7 +19,9 @@ type IndexerRepository struct {
 
 // constructor
 func NewIndexerRepository(db *gorm.DB) *IndexerRepository {
-	return &IndexerRepository{db: db}
+	return &IndexerRepository{
+		db: db,
+	}
 }
 
 func (r *IndexerRepository) FindByName(ctx context.Context, name string) (*entity.Indexer, error) {
@@ -93,12 +96,37 @@ func (r *IndexerRepository) DeleteIndexerById(ctx context.Context, id uint) erro
 
 }
 
-// func (r *IndexerRepository) DumpAll(ctx context.Context) error {
-// 	var idxs []entity.Indexer
-// 	err := r.db.WithContext(ctx).Debug().Find(&idxs).Error
-// 	if err != nil {
-// 		return err
-// 	}
-// 	fmt.Printf("ALL INDEXERS FROM GO: %#v\n", idxs)
-// 	return nil
-// }
+func (r *IndexerRepository) UpdateIndexer(ctx context.Context, indexer *entity.Indexer) error {
+	if indexer == nil {
+		return fmt.Errorf("indexer is nil")
+	}
+	if indexer.ID == 0 {
+		return fmt.Errorf("indexer ID required for update")
+	}
+	return r.db.WithContext(ctx).Save(indexer).Error
+}
+
+func (r *IndexerRepository) UpsertFromProvider(
+	ctx context.Context,
+	indexer *entity.Indexer,
+) (bool, error) {
+
+	tx := r.db.WithContext(ctx).
+		Clauses(clause.OnConflict{
+			Columns: []clause.Column{{Name: "name"}},
+			DoUpdates: clause.AssignmentColumns([]string{
+				"base_url",
+				"api_key",
+				"indexer_type",
+			}),
+		}).
+		Create(indexer)
+
+	if tx.Error != nil {
+		return false, tx.Error
+	}
+
+	// RowsAffected == 1 → inserted OR updated
+	// SQLite doesn't distinguish cleanly, but that's OK
+	return tx.RowsAffected == 1, nil
+}

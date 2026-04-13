@@ -8,4 +8,6 @@ type SearchResult struct {
 	Seeders     *int
 	Leechers    *int
 	Categories  []int
+	FormatAttr  string // raw torznab:attr name="format" value, e.g. "epub", "pdf"
+	Format      string // resolved display format (epub/pdf/mobi/audiobook/comic/unknown)
 }
