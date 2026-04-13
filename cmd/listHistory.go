@@ -40,6 +40,7 @@ var listHistoryCmd = &cobra.Command{
 				e.IndexerName,
 				e.DownloaderName,
 				utils.BytesToMb(int(e.SizeBytes)),
+				string(e.Status),
 				e.DownloadedAt.Format("2006-01-02 15:04"),
 			}
 		})

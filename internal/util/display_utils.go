@@ -23,7 +23,7 @@ const (
 	SEARCH_RESULTS    HeaderRow = "INDEX\tTITLE\tFORMAT\tINDEXER\tSIZE_MB\tSEEDERS\tLEECHERS"
 	PROVIDER_SAFE     HeaderRow = "INDEX\tNAME\tTYPE\tHOST\tPORT\tSCHEME\tENABLED"
 	PROVIDER_UNSAFE   HeaderRow = "INDEX\tNAME\tTYPE\tHOST\tPORT\tSCHEME\tAPI_KEY\tENABLED"
-	HISTORY           HeaderRow = "INDEX\tTITLE\tINDEXER\tCLIENT\tSIZE_MB\tDOWNLOADED_AT"
+	HISTORY           HeaderRow = "INDEX\tTITLE\tINDEXER\tCLIENT\tSIZE_MB\tSTATUS\tDOWNLOADED_AT"
 )
 
 // https://stackoverflow.com/questions/71628061/difference-between-any-interface-as-constraint-vs-type-of-argument

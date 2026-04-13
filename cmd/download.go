@@ -98,6 +98,7 @@ var downloadCmd = &cobra.Command{
 			IndexerName:    selectedResult.IndexerName,
 			DownloaderName: clientDetails.Name,
 			SizeBytes:      sizeBytes,
+			Status:         entity.StatusSnatched,
 		}
 		if err := historyRepo.Save(ctx, &entry); err != nil {
 			fmt.Fprintf(out, "warning: failed to record download history: %v\n", err)

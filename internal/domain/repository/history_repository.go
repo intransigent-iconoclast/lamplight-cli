@@ -46,6 +46,29 @@ func (r *HistoryRepository) ExistsByLink(ctx context.Context, link string) (bool
 	return count > 0, nil
 }
 
+func (r *HistoryRepository) FindByID(ctx context.Context, id uint) (*entity.DownloadHistory, error) {
+	var entry entity.DownloadHistory
+	err := r.db.WithContext(ctx).First(&entry, id).Error
+	if err != nil {
+		return nil, err
+	}
+	return &entry, nil
+}
+
+func (r *HistoryRepository) UpdateStatus(ctx context.Context, id uint, status entity.DownloadStatus) error {
+	result := r.db.WithContext(ctx).
+		Model(&entity.DownloadHistory{}).
+		Where("id = ?", id).
+		Update("status", status)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no entry found with id %d", id)
+	}
+	return nil
+}
+
 func (r *HistoryRepository) DeleteAll(ctx context.Context) error {
 	return r.db.WithContext(ctx).Where("1 = 1").Delete(&entity.DownloadHistory{}).Error
 }
