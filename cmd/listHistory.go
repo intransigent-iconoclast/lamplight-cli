@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
@@ -10,13 +11,15 @@ import (
 )
 
 var listHistoryCmd = &cobra.Command{
-	Use:   "list",
+	Use:   "list [search]",
 	Short: "show your download history.",
-	Long: `list all downloads. filter by status to find stuck or failed ones.
+	Long: `list all downloads. filter by status or search by title.
 
   lamplight history list
   lamplight history list --filter failed
-  lamplight history list --filter snatched`,
+  lamplight history list "memory of blood"
+  lamplight history list "fowler" --filter completed`,
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		filterStatus, _ := cmd.Flags().GetString("filter")
@@ -38,14 +41,22 @@ var listHistoryCmd = &cobra.Command{
 			return fmt.Errorf("load history: %w", err)
 		}
 
+		// fuzzy title filter
+		if len(args) > 0 {
+			query := strings.ToLower(args[0])
+			var matched []entity.DownloadHistory
+			for _, e := range entries {
+				if strings.Contains(strings.ToLower(e.Title), query) {
+					matched = append(matched, e)
+				}
+			}
+			entries = matched
+		}
+
 		out := cmd.OutOrStdout()
 
 		if len(entries) == 0 {
-			if filterStatus != "" {
-				fmt.Fprintf(out, "no entries with status '%s'\n", filterStatus)
-			} else {
-				fmt.Fprintln(out, "no download history yet.")
-			}
+			fmt.Fprintln(out, "no entries found.")
 			return nil
 		}
 
