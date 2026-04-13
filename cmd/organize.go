@@ -78,7 +78,14 @@ Everything else ends up in:
 			}
 
 			for _, entry := range completed {
-				dest, placed, organizeErr := organizeFile(entry.FilePath, libraryPath, cfg.Template, dryRun)
+				// if the stored path doesn't exist, try translating it —
+				// handles the case where path mapping was set up after the download completed
+				filePath := entry.FilePath
+				if _, err := os.Stat(filePath); os.IsNotExist(err) && cfg.DelugePath != "" {
+					filePath = translatePath(filePath, cfg.DelugePath, cfg.HostPath)
+				}
+
+				dest, placed, organizeErr := organizeFile(filePath, libraryPath, cfg.Template, dryRun)
 				if organizeErr != nil {
 					fmt.Fprintf(out, "  skip  %s — %v\n", utils.SmartTruncate(entry.Title, 50), organizeErr)
 					continue
