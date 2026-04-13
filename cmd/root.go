@@ -1,10 +1,23 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
 )
+
+var (
+	appVersion = "dev"
+	appCommit  = "none"
+	appDate    = "unknown"
+)
+
+func SetVersionInfo(version, commit, date string) {
+	appVersion = version
+	appCommit = commit
+	appDate = date
+}
 
 var rootCmd = &cobra.Command{
 	Use:   "lamplight",
@@ -34,4 +47,12 @@ func Execute() {
 	}
 }
 
-func init() {}
+func init() {
+	rootCmd.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "print the version",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Printf("lamplight %s (commit: %s, built: %s)\n", appVersion, appCommit, appDate)
+		},
+	})
+}
