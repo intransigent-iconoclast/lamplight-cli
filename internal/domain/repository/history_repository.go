@@ -69,6 +69,15 @@ func (r *HistoryRepository) UpdateStatus(ctx context.Context, id uint, status en
 	return nil
 }
 
+func (r *HistoryRepository) FindByStatus(ctx context.Context, status entity.DownloadStatus) ([]entity.DownloadHistory, error) {
+	var entries []entity.DownloadHistory
+	err := r.db.WithContext(ctx).
+		Where("status = ?", status).
+		Order("downloaded_at DESC").
+		Find(&entries).Error
+	return entries, err
+}
+
 // FindActive returns all entries that are still in-flight (snatched or downloading)
 // and have a torrent hash we can poll on.
 func (r *HistoryRepository) FindActive(ctx context.Context) ([]entity.DownloadHistory, error) {

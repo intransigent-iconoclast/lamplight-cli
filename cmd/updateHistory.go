@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"strconv"
 
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
@@ -18,24 +17,24 @@ var validStatuses = []entity.DownloadStatus{
 }
 
 var updateHistoryCmd = &cobra.Command{
-	Use:   "update <index>",
-	Short: "Update the status of a download history entry.",
-	Long:  "Manually set the status of a download. Useful for fixing stuck entries.\nValid statuses: snatched, downloading, completed, failed",
-	Args:  cobra.ExactArgs(1),
+	Use:   "update <index|title>",
+	Short: "manually fix the status of a download.",
+	Long: `set the status of a download entry by index or title fragment.
+
+  lamplight history update 3 --status failed
+  lamplight history update "memory of blood" --status failed
+
+valid statuses: snatched, downloading, completed, failed`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
-		index, err := strconv.Atoi(args[0])
-		if err != nil || index <= 0 {
-			return fmt.Errorf("invalid index '%s': must be a positive number", args[0])
-		}
-
-		statusFlag, _ := cmd.Flags().GetString("status")
-		if statusFlag == "" {
+		newStatus, _ := cmd.Flags().GetString("status")
+		if newStatus == "" {
 			return fmt.Errorf("--status is required (snatched, downloading, completed, failed)")
 		}
 
-		status := entity.DownloadStatus(statusFlag)
+		status := entity.DownloadStatus(newStatus)
 		valid := false
 		for _, s := range validStatuses {
 			if status == s {
@@ -44,8 +43,10 @@ var updateHistoryCmd = &cobra.Command{
 			}
 		}
 		if !valid {
-			return fmt.Errorf("invalid status '%s' — must be one of: snatched, downloading, completed, failed", statusFlag)
+			return fmt.Errorf("invalid status '%s' — must be one of: snatched, downloading, completed, failed", newStatus)
 		}
+
+		filterStatus, _ := cmd.Flags().GetString("filter")
 
 		db, err := utils.Open("lamplight-cli", false)
 		if err != nil {
@@ -54,28 +55,32 @@ var updateHistoryCmd = &cobra.Command{
 
 		repo := repository.NewHistoryRepository(db)
 
-		// list all so we can map display index → real DB id
-		entries, err := repo.FindAll(ctx)
+		var entries []entity.DownloadHistory
+		if filterStatus != "" {
+			entries, err = repo.FindByStatus(ctx, entity.DownloadStatus(filterStatus))
+		} else {
+			entries, err = repo.FindAll(ctx)
+		}
 		if err != nil {
 			return fmt.Errorf("load history: %w", err)
 		}
 
-		if index > len(entries) {
-			return fmt.Errorf("index %d out of range (have %d entries)", index, len(entries))
+		target, err := resolveHistoryEntry(args[0], repo, entries)
+		if err != nil {
+			return err
 		}
-
-		target := entries[index-1]
 
 		if err := repo.UpdateStatus(ctx, target.ID, status); err != nil {
 			return fmt.Errorf("update status: %w", err)
 		}
 
-		fmt.Fprintf(cmd.OutOrStdout(), "Updated #%d '%s' → %s\n", index, target.Title, status)
+		fmt.Fprintf(cmd.OutOrStdout(), "updated '%s' → %s\n", target.Title, status)
 		return nil
 	},
 }
 
 func init() {
 	historyCmd.AddCommand(updateHistoryCmd)
-	updateHistoryCmd.Flags().StringP("status", "s", "", "New status: snatched, downloading, completed, failed")
+	updateHistoryCmd.Flags().StringP("status", "s", "", "new status: snatched, downloading, completed, failed")
+	updateHistoryCmd.Flags().StringP("filter", "f", "", "filter list by status before indexing (snatched, downloading, completed, failed)")
 }
