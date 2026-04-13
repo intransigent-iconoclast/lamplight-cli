@@ -14,6 +14,7 @@ import (
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
 	utils "github.com/intransigent-iconoclast/lamplight-cli/internal/util"
 	"github.com/spf13/cobra"
+	"gorm.io/gorm"
 )
 
 var downloadCmd = &cobra.Command{
@@ -76,7 +77,7 @@ var downloadCmd = &cobra.Command{
 			return fmt.Errorf("resolve torrent: %w", err)
 		}
 
-		downloaderClient, err := createClient(ctx, nil)
+		downloaderClient, clientDetails, err := createClient(ctx, db, nil)
 		if err != nil {
 			return fmt.Errorf("error creating downloader client: %w", err)
 		}
@@ -85,29 +86,41 @@ var downloadCmd = &cobra.Command{
 			return fmt.Errorf("failed to add torrent: %w", err)
 		}
 
+		// Record to history — non-fatal if this fails
+		historyRepo := repository.NewHistoryRepository(db)
+		var sizeBytes int64
+		if selectedResult.SizeBytes != nil {
+			sizeBytes = *selectedResult.SizeBytes
+		}
+		entry := entity.DownloadHistory{
+			Title:          selectedResult.Title,
+			Link:           selectedResult.Link,
+			IndexerName:    selectedResult.IndexerName,
+			DownloaderName: clientDetails.Name,
+			SizeBytes:      sizeBytes,
+		}
+		if err := historyRepo.Save(ctx, &entry); err != nil {
+			fmt.Fprintf(out, "warning: failed to record download history: %v\n", err)
+		}
+
 		fmt.Fprintf(out, "Added: %s\n", selectedResult.Title)
 		return nil
 	},
 }
 
-func createClient(ctx context.Context, clientIndex *int) (client.DownloaderClient, error) {
-	db, err := utils.Open("lamplight-cli", false)
-	if err != nil {
-		return nil, fmt.Errorf("unable to open db: %w", err)
-	}
-
+func createClient(ctx context.Context, db *gorm.DB, clientIndex *int) (client.DownloaderClient, *entity.Downloader, error) {
 	repo := repository.NewDownloaderRepository(db)
 
 	clientDetails, err := repo.FindHighestPriorityDownloader(ctx)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	switch clientDetails.ClientType {
 	case entity.Deluge:
-		return client.NewDelugeClient(nil, clientDetails), nil
+		return client.NewDelugeClient(nil, clientDetails), clientDetails, nil
 	default:
-		return nil, fmt.Errorf("unsupported downloader type: %s", clientDetails.ClientType)
+		return nil, nil, fmt.Errorf("unsupported downloader type: %s", clientDetails.ClientType)
 	}
 }
 

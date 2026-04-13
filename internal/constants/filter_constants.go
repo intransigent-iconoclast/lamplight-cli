@@ -1,7 +1,9 @@
 package constants
 
-// torznab categories from jackett ... not sure if prowlar is different
+// Standard Newznab/Torznab categories included in book searches.
+// 3030 = Audio/Audiobook is intentionally included so audiobooks pass the --books filter.
 var BookCategories = []int{
+	3030, // Audio/Audiobook
 	7000, // Books
 	7010, // Books/Mags
 	7020, // Books/EBook

@@ -7,8 +7,8 @@ import (
 )
 
 // indexerCmd represents the indexer command
-var indexerCmd = &cobra.Command{
-	Use:   "indexer",
+var providerCmd = &cobra.Command{
+	Use:   "provider",
 	Short: "Root command for controlling operations involving indexers",
 	Long: `This is a root command for controlling operations involving indexers.
 	This includes the following commands:
@@ -22,5 +22,5 @@ var indexerCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(indexerCmd)
+	rootCmd.AddCommand(providerCmd)
 }

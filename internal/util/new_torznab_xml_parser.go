@@ -48,9 +48,10 @@ func ParseTorznabXml(xmlStr string) ([]dao.SearchResult, error) {
 
 	for _, it := range doc.Channel.Items {
 		var (
-			sizeBytes *int64
-			seeders   *int
-			leechers  *int
+			sizeBytes  *int64
+			seeders    *int
+			leechers   *int
+			formatAttr string
 		)
 
 		if it.Size > 0 {
@@ -60,6 +61,13 @@ func ParseTorznabXml(xmlStr string) ([]dao.SearchResult, error) {
 
 		for _, a := range it.Attrs {
 			switch a.Name {
+			case "category":
+				if v, err := strconv.Atoi(a.Value); err == nil {
+					it.Categories = append(it.Categories, v)
+				}
+			case "format":
+				// some book indexers (e.g. Libgen) explicitly include the file format
+				formatAttr = strings.ToLower(strings.TrimSpace(a.Value))
 			case "seeders":
 				if v, err := strconv.Atoi(a.Value); err == nil {
 					x := v
@@ -83,13 +91,14 @@ func ParseTorznabXml(xmlStr string) ([]dao.SearchResult, error) {
 		}
 
 		results = append(results, dao.SearchResult{
-			Title:       it.Title,
-			Link:        it.Link,
-			IndexerName: doc.Channel.IndexerTitle, // e.g. "The Pirate Bay"
-			SizeBytes:   sizeBytes,
-			Seeders:     seeders,
-			Leechers:    leechers,
-			Categories:  it.Categories,
+			Title:      it.Title,
+			Link:       it.Link,
+			IndexerName: doc.Channel.IndexerTitle,
+			SizeBytes:  sizeBytes,
+			Seeders:    seeders,
+			Leechers:   leechers,
+			Categories: it.Categories,
+			FormatAttr: formatAttr,
 		})
 	}
 

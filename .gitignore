@@ -35,3 +35,12 @@ target
 *.log
 
 scripts/smoke-test.sh
+Cl
+scripts
+
+jackett.xml
+prowlarr.json
+CLAUDE.md
+.claire
+.claude
+.vscode
