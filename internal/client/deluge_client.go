@@ -216,10 +216,6 @@ func (c *DelugeClient) Authenticate(ctx context.Context) error {
 	return nil
 }
 
-// Builds the delgue Url. In theory it could be possible that the url this constructs is invalid.
-// but that doesn't matter because any function invoking this should handle error and display the url. This
-// would always be caused by user error (incorectly constructed at client creation time).
-// TODO: Add error for this type of issue so user knows what they did wrong.
 func buildDelugeUrl(details entity.Downloader) string {
 	return fmt.Sprintf("%s://%s:%d/json", details.Scheme, details.Host, details.Port)
 }

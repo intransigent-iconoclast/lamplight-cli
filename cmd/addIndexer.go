@@ -1,6 +1,3 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -27,7 +24,6 @@ most users should run 'lamplight provider sync' instead of this.
     --base-url "http://localhost:9117/api/v2.0/indexers/thepiratebay/results/torznab/api" \
     --api-key "YOUR_API_KEY"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// TODO: Validate this later
 		name, err := cmd.Flags().GetString("name")
 		if err != nil {
 			return fmt.Errorf("get flag 'name': %w", err)
