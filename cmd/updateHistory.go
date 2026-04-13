@@ -22,10 +22,7 @@ var updateHistoryCmd = &cobra.Command{
 	Short: "manually fix the status of a download.",
 	Long: `set the status on a download by its index number.
 
-use --filter to narrow the list first so the numbers stay small:
-
-  lamplight history list --filter failed
-  lamplight history update 1 --filter failed --status snatched
+use 'lamplight history list --filter failed' to find the index first.
 
 valid statuses: snatched, downloading, completed, failed`,
 	Args: cobra.ExactArgs(1),
@@ -54,8 +51,6 @@ valid statuses: snatched, downloading, completed, failed`,
 			return fmt.Errorf("invalid status '%s' — must be one of: snatched, downloading, completed, failed", newStatus)
 		}
 
-		filterStatus, _ := cmd.Flags().GetString("filter")
-
 		db, err := utils.Open("lamplight-cli", false)
 		if err != nil {
 			return fmt.Errorf("open db: %w", err)
@@ -63,12 +58,7 @@ valid statuses: snatched, downloading, completed, failed`,
 
 		repo := repository.NewHistoryRepository(db)
 
-		var entries []entity.DownloadHistory
-		if filterStatus != "" {
-			entries, err = repo.FindByStatus(ctx, entity.DownloadStatus(filterStatus))
-		} else {
-			entries, err = repo.FindAll(ctx)
-		}
+		entries, err := repo.FindAll(ctx)
 		if err != nil {
 			return fmt.Errorf("load history: %w", err)
 		}
@@ -91,5 +81,4 @@ valid statuses: snatched, downloading, completed, failed`,
 func init() {
 	historyCmd.AddCommand(updateHistoryCmd)
 	updateHistoryCmd.Flags().StringP("status", "s", "", "new status: snatched, downloading, completed, failed")
-	updateHistoryCmd.Flags().StringP("filter", "f", "", "filter list by status before indexing (snatched, downloading, completed, failed)")
 }

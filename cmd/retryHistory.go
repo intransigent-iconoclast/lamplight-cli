@@ -18,10 +18,9 @@ var retryHistoryCmd = &cobra.Command{
 	Short: "re-send a stuck or failed download to Deluge.",
 	Long: `re-sends the torrent to Deluge and saves the new hash so 'history sync' can track it.
 
-use --filter to narrow the list first so the numbers stay small:
+use 'lamplight history list --filter failed' to find the index first.
 
-  lamplight history list --filter failed
-  lamplight history retry 1 --filter failed`,
+  lamplight history retry 3`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
@@ -32,8 +31,6 @@ use --filter to narrow the list first so the numbers stay small:
 			return fmt.Errorf("invalid index '%s': must be a positive number", args[0])
 		}
 
-		filterStatus, _ := cmd.Flags().GetString("filter")
-
 		db, err := utils.Open("lamplight-cli", false)
 		if err != nil {
 			return fmt.Errorf("open db: %w", err)
@@ -41,12 +38,7 @@ use --filter to narrow the list first so the numbers stay small:
 
 		histRepo := repository.NewHistoryRepository(db)
 
-		var entries []entity.DownloadHistory
-		if filterStatus != "" {
-			entries, err = histRepo.FindByStatus(ctx, entity.DownloadStatus(filterStatus))
-		} else {
-			entries, err = histRepo.FindAll(ctx)
-		}
+		entries, err := histRepo.FindAll(ctx)
 		if err != nil {
 			return fmt.Errorf("load history: %w", err)
 		}
@@ -87,5 +79,4 @@ use --filter to narrow the list first so the numbers stay small:
 
 func init() {
 	historyCmd.AddCommand(retryHistoryCmd)
-	retryHistoryCmd.Flags().StringP("filter", "f", "", "filter list by status before indexing (snatched, downloading, completed, failed)")
 }
