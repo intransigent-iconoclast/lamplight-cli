@@ -42,3 +42,11 @@ scripts/test-organize.sh
 *.db.sqlite
 *.db.sqlite-shm
 *.db.sqlite-wal
+
+# claude code
+.claude/
+CLAUDE.md
+
+# provider response dumps
+jackett.xml
+prowlarr.json
