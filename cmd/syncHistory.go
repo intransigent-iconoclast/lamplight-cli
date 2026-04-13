@@ -12,7 +12,7 @@ import (
 
 var syncHistoryCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "Poll Deluge and update status of active downloads.",
+	Short: "check Deluge for status updates on active downloads.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		out := cmd.OutOrStdout()

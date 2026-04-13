@@ -15,8 +15,7 @@ import (
 // deleteIndexerCmd represents the deleteIndexer command
 var deleteIndexerCmd = &cobra.Command{
 	Use:   "delete",
-	Short: "A brief description of your command",
-	Long:  ``,
+	Short: "remove an indexer by name or list index.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// input validation since we CAN'T use MarkFlagRequired (we allow multiple options conceptually)
 		useIndex := cmd.Flags().Changed("index")

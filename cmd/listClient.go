@@ -16,8 +16,7 @@ import (
 // listClientCmd represents the listClient command
 var listClientCmd = &cobra.Command{
 	Use:   "list",
-	Short: "A brief description of your command",
-	Long:  ``,
+	Short: "list all configured downloader clients.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 
@@ -35,7 +34,8 @@ var listClientCmd = &cobra.Command{
 		}
 
 		if len(clients) < 1 {
-			return fmt.Errorf("No Indexers found. Please add an download client.")
+			fmt.Fprintln(cmd.OutOrStdout(), "No clients configured yet. Use 'lamplight client add' to add one.")
+			return nil
 		}
 
 		// this is to get an io.Writer object (and yes i will use the word object!) since tabwriter requires one.

@@ -16,33 +16,11 @@ import (
 // listIndexersCmd represents the listIndexers command
 var listIndexersCmd = &cobra.Command{
 	Use:   "list",
-	Short: "A brief description of your command",
-	Long: `List all configured indexers in the Lamplight database.
+	Short: "list all configured indexers.",
+	Long: `show all indexers lamplight knows about. api keys are hidden by default.
 
-This command prints a table of indexers with the following columns:
-
-  - INDEX     Zero-based index for convenience when updating/deleting.
-  - NAME      Logical name for the indexer (e.g. "thepiratebay").
-  - PRIORITY  Integer priority used to decide which indexers to query first.
-  - TYPE      Indexer type (e.g. TORZNAB).
-  - ENABLED   Whether the indexer is currently enabled (yes/no).
-  - BASE_URL  The base URL used to query this indexer.
-  - API_KEY   (Optional) The configured API key, if --safe is provided.
-
-By default, API keys are NOT shown. To include them in the output, use:
-
-  lamplight indexer list --safe
-
-Examples:
-
-  # List all indexers (without API keys)
   lamplight indexer list
-
-  # List all indexers and include their API keys
-  lamplight indexer list --safe
-
-You can use the INDEX column when building future commands (e.g. update or
-delete) to refer to a specific indexer without having to retype its name.`,
+  lamplight indexer list --unsafe   # shows api keys too`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 

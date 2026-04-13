@@ -10,7 +10,7 @@ import (
 
 var clearHistoryCmd = &cobra.Command{
 	Use:   "clear",
-	Short: "Clear all download history.",
+	Short: "wipe all download history.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 

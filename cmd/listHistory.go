@@ -11,7 +11,7 @@ import (
 
 var listHistoryCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List download history.",
+	Short: "show your download history.",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 

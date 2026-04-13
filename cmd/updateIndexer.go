@@ -12,20 +12,13 @@ import (
 
 var updateIndexerCmd = &cobra.Command{
 	Use:   "update <index>",
-	Short: "Update an existing indexer.",
-	Long: `Update fields on an existing indexer.
+	Short: "update an indexer's settings.",
+	Long: `update one or more fields on an indexer. only the flags you pass will change.
 
-The indexer is selected using the INDEX shown in:
+use the index from 'lamplight indexer list' to select which one.
 
-  lamplight indexer list
-
-Only flags explicitly provided will be updated.
-
-Enable or disable the indexer with:
-
-  --enable
-  --disable
-`,
+  lamplight indexer update 3 --priority 10
+  lamplight indexer update 3 --disable`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()

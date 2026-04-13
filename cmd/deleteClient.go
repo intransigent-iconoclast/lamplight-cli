@@ -10,7 +10,7 @@ import (
 
 var deleteClientCmd = &cobra.Command{
 	Use:   "delete <name>",
-	Short: "Delete a configured downloader client by name.",
+	Short: "remove a downloader client by name.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()

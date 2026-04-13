@@ -9,15 +9,13 @@ import (
 // indexerCmd represents the indexer command
 var indexerCmd = &cobra.Command{
 	Use:   "indexer",
-	Short: "Root command for controlling operations involving indexers",
-	Long: `This is a root command for controlling operations involving indexers.
-	This includes the following commands:
-		add
-		remove
-		list
-	`,
+	Short: "manage your configured indexers.",
+	Long: `add, remove, update, and list the torznab indexers lamplight queries.
+
+most of the time you won't touch this directly — 'provider sync' handles it.
+but if you need to manually add or tweak an indexer, this is the place.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Error: command requires a resource such as add, remove, or list.")
+		fmt.Println("Error: command requires a subcommand: add, list, update, delete")
 	},
 }
 

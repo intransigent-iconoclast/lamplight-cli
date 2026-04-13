@@ -10,7 +10,7 @@ import (
 
 var deleteProviderCmd = &cobra.Command{
 	Use:   "delete <name>",
-	Short: "Delete a configured provider by name.",
+	Short: "remove a provider by name.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()

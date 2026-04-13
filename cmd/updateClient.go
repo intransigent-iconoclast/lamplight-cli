@@ -11,7 +11,7 @@ import (
 
 var updateClientCmd = &cobra.Command{
 	Use:   "update <name>",
-	Short: "Update an existing downloader client.",
+	Short: "update an existing downloader client.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 

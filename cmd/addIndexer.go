@@ -16,35 +16,16 @@ import (
 // addIndexerCmd represents the addIndexer command
 var addIndexerCmd = &cobra.Command{
 	Use:   "add",
-	Short: "This command adds an indexer manually that you will be able to query.",
-	// this is where chatgpt shines :)
-	Long: `Add a new indexer record to the Lamplight database.
+	Short: "add an indexer manually.",
+	Long: `add a torznab indexer directly — useful if you're not using Prowlarr or Jackett
+and just have a raw torznab endpoint you want to query.
 
-An "indexer" is a search source (for example, a Jackett or Prowlarr
-Torznab endpoint) that Lamplight can query for results.
+most users should run 'lamplight provider sync' instead of this.
 
-You must provide at least:
-  - a unique name (logical label, e.g. "The Pirate Bay")
-  - the base URL for the indexer
-Optionally, you can provide an API key and indexer type.
-
-Examples:
-
-  # Add a Torznab indexer pointing at a Jackett instance
   lamplight indexer add \
     --name "thepiratebay" \
-    --base-url "http://127.0.0.1:9117/api/v2.0/indexers/thepiratebay/results/torznab/api" \
-    --api-key "YOUR_JACKETT_API_KEY" \
-    --indexer-type TORZNAB
-
-  # Add another indexer with a different logical name
-  lamplight indexer add \
-    -n "rarbg" \
-    -u "http://127.0.0.1:9117/api/v2.0/indexers/rarbg/results/torznab/api" \
-    -k "YOUR_JACKETT_API_KEY" \
-    -t TORZNAB
-
-After adding an indexer, other commands can use it to run searches.`,
+    --base-url "http://localhost:9117/api/v2.0/indexers/thepiratebay/results/torznab/api" \
+    --api-key "YOUR_API_KEY"`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		// TODO: Validate this later
 		name, err := cmd.Flags().GetString("name")

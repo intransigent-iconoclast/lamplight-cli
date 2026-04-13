@@ -8,9 +8,9 @@ import (
 
 var historyCmd = &cobra.Command{
 	Use:   "history",
-	Short: "View and manage download history.",
+	Short: "view and manage your download history.",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("Error: command requires a subcommand: list, clear, update, retry")
+		fmt.Println("Error: command requires a subcommand: list, sync, update, retry, clear")
 	},
 }
 

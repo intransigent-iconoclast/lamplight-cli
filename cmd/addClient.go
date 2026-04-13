@@ -12,7 +12,7 @@ import (
 
 var addClientCmd = &cobra.Command{
 	Use:   "add <name>",
-	Short: "Add a downloader client.",
+	Short: "add a Deluge client.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 

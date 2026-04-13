@@ -15,12 +15,13 @@ import (
 
 var addProviderCmd = &cobra.Command{
 	Use:   "add",
-	Short: "Add an indexer provider (Prowlarr or Jackett).",
-	Long: `Add a new indexer provider to Lamplight.
+	Short: "add a Prowlarr or Jackett provider.",
+	Long: `point lamplight at your Prowlarr or Jackett instance.
 
-A provider represents an indexer manager instance such as Prowlarr or Jackett.
-New providers are ENABLED by default.
-`,
+once added, run 'lamplight provider sync' to pull all its indexers in.
+
+  lamplight provider add --name prowlarr --type prowlarr --host localhost --port 9696 --api-key xxx
+  lamplight provider add --name jackett  --type jackett  --host localhost --port 9117 --api-key xxx`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 

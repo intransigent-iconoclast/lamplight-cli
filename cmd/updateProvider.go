@@ -16,20 +16,13 @@ import (
 
 var updateProviderCmd = &cobra.Command{
 	Use:   "update <index>",
-	Short: "Update an existing provider.",
-	Long: `Update fields on an existing provider.
+	Short: "update a provider's settings.",
+	Long: `update one or more fields on a provider. only the flags you pass will change.
 
-The provider is selected using the INDEX shown in:
+use the index from 'lamplight provider list' to select which one.
 
-  lamplight provider list
-
-Only fields explicitly provided will be updated.
-
-Enable or disable the provider using flags:
-
-  --enable
-  --disable
-`,
+  lamplight provider update 1 --api-key new_key
+  lamplight provider update 1 --disable`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
