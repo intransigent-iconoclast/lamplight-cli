@@ -17,13 +17,26 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	cacheWarnAfter  = 10 * time.Minute
+	cacheStaleAfter = 30 * time.Minute
+)
+
 var downloadCmd = &cobra.Command{
 	Use:   "download <index>",
-	Short: "Download a result from the last search.",
-	Args:  cobra.ExactArgs(1),
+	Short: "download a result from your last search.",
+	Long: `pick a result by index from your last search and send it to Deluge.
+
+results go stale after 30 minutes — re-run your search if that happens.
+use --force to download anyway if you know what you're doing.
+
+  lamplight download 3
+  lamplight download 3 --force`,
+	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		out := cmd.OutOrStdout()
+		force, _ := cmd.Flags().GetBool("force")
 
 		index, err := strconv.Atoi(args[0])
 		if err != nil {
@@ -42,11 +55,18 @@ var downloadCmd = &cobra.Command{
 
 		cache, err := cacheRepo.GetCache(ctx)
 		if err != nil {
-			return fmt.Errorf("no cached search results found. Run 'lamplight search <query>' first")
+			return fmt.Errorf("no cached results found — run 'lamplight search <query>' first")
 		}
 
-		if time.Since(cache.UpdatedAt) > 10*time.Minute {
-			fmt.Fprintln(out, "Warning: cached search results are older than 10 minutes.")
+		age := time.Since(cache.UpdatedAt)
+		if age > cacheStaleAfter && !force {
+			return fmt.Errorf(
+				"search results are %.0f minutes old — re-run your search or use --force to download anyway",
+				age.Minutes(),
+			)
+		}
+		if age > cacheWarnAfter {
+			fmt.Fprintf(out, "heads up: these results are %.0f minutes old\n", age.Minutes())
 		}
 
 		var results []dao.SearchResult
@@ -129,4 +149,5 @@ func createClient(ctx context.Context, db *gorm.DB, clientIndex *int) (client.Do
 
 func init() {
 	rootCmd.AddCommand(downloadCmd)
+	downloadCmd.Flags().BoolP("force", "f", false, "download even if the search results are stale")
 }
