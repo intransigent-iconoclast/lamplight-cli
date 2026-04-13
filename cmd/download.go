@@ -82,7 +82,8 @@ var downloadCmd = &cobra.Command{
 			return fmt.Errorf("error creating downloader client: %w", err)
 		}
 
-		if err := downloaderClient.Add(ctx, resolved); err != nil {
+		hash, err := downloaderClient.Add(ctx, resolved)
+		if err != nil {
 			return fmt.Errorf("failed to add torrent: %w", err)
 		}
 
@@ -99,6 +100,7 @@ var downloadCmd = &cobra.Command{
 			DownloaderName: clientDetails.Name,
 			SizeBytes:      sizeBytes,
 			Status:         entity.StatusSnatched,
+			TorrentHash:    hash,
 		}
 		if err := historyRepo.Save(ctx, &entry); err != nil {
 			fmt.Fprintf(out, "warning: failed to record download history: %v\n", err)

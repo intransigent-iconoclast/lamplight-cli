@@ -58,7 +58,7 @@ var retryHistoryCmd = &cobra.Command{
 			return fmt.Errorf("create downloader client: %w", err)
 		}
 
-		if err := downloaderClient.Add(ctx, resolved); err != nil {
+		if _, err := downloaderClient.Add(ctx, resolved); err != nil {
 			// mark as failed so the user knows it didn't go through
 			_ = histRepo.UpdateStatus(ctx, target.ID, entity.StatusFailed)
 			return fmt.Errorf("add torrent: %w", err)

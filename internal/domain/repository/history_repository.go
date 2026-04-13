@@ -69,6 +69,41 @@ func (r *HistoryRepository) UpdateStatus(ctx context.Context, id uint, status en
 	return nil
 }
 
+// FindActive returns all entries that are still in-flight (snatched or downloading)
+// and have a torrent hash we can poll on.
+func (r *HistoryRepository) FindActive(ctx context.Context) ([]entity.DownloadHistory, error) {
+	var entries []entity.DownloadHistory
+	err := r.db.WithContext(ctx).
+		Where("status IN ? AND torrent_hash != ''", []string{"snatched", "downloading"}).
+		Order("downloaded_at DESC").
+		Find(&entries).Error
+	return entries, err
+}
+
+// FindCompleted returns entries that finished downloading but haven't been organized yet.
+func (r *HistoryRepository) FindCompleted(ctx context.Context) ([]entity.DownloadHistory, error) {
+	var entries []entity.DownloadHistory
+	err := r.db.WithContext(ctx).
+		Where("status = ? AND file_path != ''", entity.StatusCompleted).
+		Order("downloaded_at DESC").
+		Find(&entries).Error
+	return entries, err
+}
+
+func (r *HistoryRepository) UpdateStatusAndPath(ctx context.Context, id uint, status entity.DownloadStatus, filePath string) error {
+	result := r.db.WithContext(ctx).
+		Model(&entity.DownloadHistory{}).
+		Where("id = ?", id).
+		Updates(map[string]any{"status": status, "file_path": filePath})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no entry found with id %d", id)
+	}
+	return nil
+}
+
 func (r *HistoryRepository) DeleteAll(ctx context.Context) error {
 	return r.db.WithContext(ctx).Where("1 = 1").Delete(&entity.DownloadHistory{}).Error
 }

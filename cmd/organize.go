@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
 	utils "github.com/intransigent-iconoclast/lamplight-cli/internal/util"
 	"github.com/spf13/cobra"
@@ -27,19 +28,24 @@ var bookExtensions = map[string]bool{
 }
 
 var organizeCmd = &cobra.Command{
-	Use:   "organize <path>",
-	Short: "Move a downloaded book (or directory of books) into your library.",
-	Long: `Reads metadata from each file and moves it into your configured library.
+	Use:   "organize [path]",
+	Short: "Move completed downloads into your library.",
+	Long: `Without a path, organizes all completed lamplight downloads.
+Run 'lamplight history sync' first to update download statuses.
+
+  lamplight history sync
+  lamplight organize
+
+You can also point it at a specific file manually:
 
   lamplight organize ~/Downloads/some-book.epub
-  lamplight organize /opt/docker/data/delugevpn/downloads/incomplete/
 
 Files with enough metadata (author + title) go into:
   <library-path>/library/<template>.<ext>
 
 Everything else ends up in:
   <library-path>/uncategorized/<filename>`,
-	Args: cobra.ExactArgs(1),
+	Args: cobra.MaximumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		out := cmd.OutOrStdout()
@@ -58,6 +64,41 @@ Everything else ends up in:
 
 		libraryPath := expandHome(cfg.LibraryPath)
 
+		// --- no path: process completed history entries ---
+		if len(args) == 0 {
+			histRepo := repository.NewHistoryRepository(db)
+			completed, err := histRepo.FindCompleted(ctx)
+			if err != nil {
+				return fmt.Errorf("load completed downloads: %w", err)
+			}
+
+			if len(completed) == 0 {
+				fmt.Fprintln(out, "No completed downloads to organize. Run 'lamplight history sync' first.")
+				return nil
+			}
+
+			for _, entry := range completed {
+				dest, placed, organizeErr := organizeFile(entry.FilePath, libraryPath, cfg.Template, dryRun)
+				if organizeErr != nil {
+					fmt.Fprintf(out, "  skip  %s — %v\n", utils.SmartTruncate(entry.Title, 50), organizeErr)
+					continue
+				}
+
+				if !dryRun {
+					_ = histRepo.UpdateStatusAndPath(ctx, entry.ID, entity.StatusCompleted, dest)
+				}
+
+				if placed == "library" {
+					fmt.Fprintf(out, "  ok    %s\n        → library/%s\n", utils.SmartTruncate(entry.Title, 50), dest)
+				} else {
+					fmt.Fprintf(out, "  ok    %s\n        → uncategorized/%s\n", utils.SmartTruncate(entry.Title, 50), filepath.Base(dest))
+				}
+			}
+
+			return nil
+		}
+
+		// --- path provided: one-off manual organize ---
 		inputPath := args[0]
 		info, err := os.Stat(inputPath)
 		if err != nil {
@@ -66,22 +107,13 @@ Everything else ends up in:
 
 		var files []string
 		if info.IsDir() {
-			entries, err := collectBookFiles(inputPath)
-			if err != nil {
-				return fmt.Errorf("scan directory: %w", err)
-			}
-			files = entries
-		} else {
-			if !bookExtensions[strings.ToLower(filepath.Ext(inputPath))] {
-				return fmt.Errorf("'%s' doesn't look like a book file", filepath.Base(inputPath))
-			}
-			files = []string{inputPath}
+			return fmt.Errorf("organizing a raw directory is no longer supported — use 'lamplight history sync' then 'lamplight organize'")
 		}
 
-		if len(files) == 0 {
-			fmt.Fprintln(out, "No book files found.")
-			return nil
+		if !bookExtensions[strings.ToLower(filepath.Ext(inputPath))] {
+			return fmt.Errorf("'%s' doesn't look like a book file", filepath.Base(inputPath))
 		}
+		files = []string{inputPath}
 
 		for _, file := range files {
 			dest, placed, organizeErr := organizeFile(file, libraryPath, cfg.Template, dryRun)
@@ -105,8 +137,7 @@ Everything else ends up in:
 func organizeFile(src, libraryRoot, tmpl string, dryRun bool) (string, string, error) {
 	meta, err := utils.ReadMetadata(src)
 	if err != nil {
-		// non-fatal — fall back to uncategorized
-		_ = err
+		_ = err // non-fatal — fall back to uncategorized
 	}
 
 	ext := strings.ToLower(filepath.Ext(src))
@@ -125,8 +156,6 @@ func organizeFile(src, libraryRoot, tmpl string, dryRun bool) (string, string, e
 	}
 
 	destFile := filepath.Join(destDir, filepath.Base(relPath))
-
-	// handle conflicts: if same format already exists, append _2, _3, …
 	destFile = resolveConflict(destFile)
 
 	if dryRun {
@@ -157,7 +186,7 @@ func resolveConflict(path string) string {
 			return candidate
 		}
 	}
-	return path // give up, overwrite
+	return path
 }
 
 // moveFile tries os.Rename first (fast, same-device), falls back to copy+delete.
@@ -165,7 +194,6 @@ func moveFile(src, dst string) error {
 	if err := os.Rename(src, dst); err == nil {
 		return nil
 	}
-	// cross-device — copy then delete
 	in, err := os.Open(src)
 	if err != nil {
 		return err
@@ -193,7 +221,7 @@ func collectBookFiles(dir string) ([]string, error) {
 	var files []string
 	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
-			return nil // skip unreadable entries
+			return nil
 		}
 		if !info.IsDir() && bookExtensions[strings.ToLower(filepath.Ext(path))] {
 			files = append(files, path)

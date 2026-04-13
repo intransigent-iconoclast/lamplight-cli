@@ -45,9 +45,9 @@ func (c *DelugeClient) Supports(kind entity.DownloaderType) bool {
 	return kind == entity.Deluge
 }
 
-func (c *DelugeClient) Add(ctx context.Context, resolved *ResolvedTorrent) error {
+func (c *DelugeClient) Add(ctx context.Context, resolved *ResolvedTorrent) (string, error) {
 	if err := c.Authenticate(ctx); err != nil {
-		return fmt.Errorf("authenticate: %w", err)
+		return "", fmt.Errorf("authenticate: %w", err)
 	}
 
 	if resolved.Magnet != "" {
@@ -58,68 +58,106 @@ func (c *DelugeClient) Add(ctx context.Context, resolved *ResolvedTorrent) error
 		return c.addFile(ctx, resolved.FileBytes)
 	}
 
-	return fmt.Errorf("invalid resolved torrent")
+	return "", fmt.Errorf("invalid resolved torrent")
 }
 
-func (c *DelugeClient) addMagnet(ctx context.Context, magnet string) error {
-	params := []any{magnet, map[string]any{}}
-
+func (c *DelugeClient) addMagnet(ctx context.Context, magnet string) (string, error) {
 	body := dao.DelugeAddMagnetBody{
 		Method: "core.add_torrent_magnet",
-		Params: params,
+		Params: []any{magnet, map[string]any{}},
 		ID:     2,
 	}
-
 	return c.sendRPC(ctx, body)
 }
 
-func (c *DelugeClient) addFile(ctx context.Context, torrentBytes []byte) error {
+func (c *DelugeClient) addFile(ctx context.Context, torrentBytes []byte) (string, error) {
 	encoded := base64.StdEncoding.EncodeToString(torrentBytes)
-
-	params := []any{
-		"lamplight.torrent",
-		encoded,
-		map[string]any{},
-	}
-
 	body := dao.DelugeAddFileBody{
 		Method: "core.add_torrent_file",
-		Params: params,
+		Params: []any{"lamplight.torrent", encoded, map[string]any{}},
 		ID:     2,
 	}
-
 	return c.sendRPC(ctx, body)
 }
 
-func (c *DelugeClient) sendRPC(ctx context.Context, payload any) error {
-	bodyBytes, err := json.Marshal(payload)
-	if err != nil {
-		return fmt.Errorf("marshal rpc body: %w", err)
+// GetTorrentStatus queries Deluge for the current state of a torrent by hash.
+func (c *DelugeClient) GetTorrentStatus(ctx context.Context, hash string) (*TorrentStatus, error) {
+	if err := c.Authenticate(ctx); err != nil {
+		return nil, fmt.Errorf("authenticate: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(
-		ctx,
-		http.MethodPost,
-		buildDelugeUrl(*c.clientDetails),
-		bytes.NewBuffer(bodyBytes),
-	)
-	if err != nil {
-		return fmt.Errorf("create rpc request: %w", err)
+	body := map[string]any{
+		"method": "core.get_torrent_status",
+		"params": []any{hash, []string{"state", "progress", "save_path", "name", "files"}},
+		"id":     3,
 	}
 
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("marshal rpc body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, buildDelugeUrl(*c.clientDetails), bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return fmt.Errorf("rpc request failed: %w", err)
+		return nil, fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	var result dao.DelugeTorrentStatusResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	s := result.Result
+	filePath := ""
+	if len(s.Files) > 0 {
+		filePath = s.SavePath + "/" + s.Files[0].Path
+	} else if s.Name != "" {
+		filePath = s.SavePath + "/" + s.Name
+	}
+
+	return &TorrentStatus{
+		State:    s.State,
+		Progress: s.Progress,
+		FilePath: filePath,
+	}, nil
+}
+
+// sendRPC sends a JSON-RPC call and returns the string result (torrent hash).
+func (c *DelugeClient) sendRPC(ctx context.Context, payload any) (string, error) {
+	bodyBytes, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("marshal rpc body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, buildDelugeUrl(*c.clientDetails), bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return "", fmt.Errorf("create rpc request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("rpc request failed: %w", err)
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("deluge returned status %d", resp.StatusCode)
+		return "", fmt.Errorf("deluge returned status %d", resp.StatusCode)
 	}
 
-	return nil
+	var result dao.DelugeAddResponseBody
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decode response: %w", err)
+	}
+
+	return result.Result, nil
 }
 
 // this feels very verbose

@@ -19,6 +19,8 @@ type DownloadHistory struct {
 	DownloaderName string         `gorm:"size:75;not null"`
 	SizeBytes      int64          `gorm:"default:0"`
 	Status         DownloadStatus `gorm:"size:20;not null;default:'snatched'"`
+	TorrentHash    string         `gorm:"size:64"`  // hash returned by deluge on add
+	FilePath       string         `gorm:"size:2048"` // full path once completed
 	DownloadedAt   time.Time      `gorm:"not null"`
 }
 
