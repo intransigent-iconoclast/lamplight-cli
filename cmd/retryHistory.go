@@ -15,8 +15,8 @@ import (
 
 var retryHistoryCmd = &cobra.Command{
 	Use:   "retry <index>",
-	Short: "Re-send a download to the client.",
-	Long:  "Re-requests a download that got stuck or failed. Resets status to snatched.",
+	Short: "re-send a stuck or failed download to Deluge.",
+	Long:  "re-sends the torrent to Deluge and saves the new hash so 'history sync' can track it.",
 	Args:  cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
@@ -58,17 +58,18 @@ var retryHistoryCmd = &cobra.Command{
 			return fmt.Errorf("create downloader client: %w", err)
 		}
 
-		if _, err := downloaderClient.Add(ctx, resolved); err != nil {
-			// mark as failed so the user knows it didn't go through
+		hash, err := downloaderClient.Add(ctx, resolved)
+		if err != nil {
 			_ = histRepo.UpdateStatus(ctx, target.ID, entity.StatusFailed)
 			return fmt.Errorf("add torrent: %w", err)
 		}
 
-		if err := histRepo.UpdateStatus(ctx, target.ID, entity.StatusSnatched); err != nil {
-			fmt.Fprintf(out, "warning: couldn't reset status: %v\n", err)
+		// store the new hash so history sync can track this retry
+		if err := histRepo.UpdateStatusAndHash(ctx, target.ID, entity.StatusSnatched, hash); err != nil {
+			fmt.Fprintf(out, "warning: couldn't update status: %v\n", err)
 		}
 
-		fmt.Fprintf(out, "Re-sent to client. Status reset to snatched.\n")
+		fmt.Fprintf(out, "re-sent to Deluge. status reset to snatched.\n")
 		return nil
 	},
 }

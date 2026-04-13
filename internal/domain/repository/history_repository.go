@@ -90,6 +90,20 @@ func (r *HistoryRepository) FindCompleted(ctx context.Context) ([]entity.Downloa
 	return entries, err
 }
 
+func (r *HistoryRepository) UpdateStatusAndHash(ctx context.Context, id uint, status entity.DownloadStatus, hash string) error {
+	result := r.db.WithContext(ctx).
+		Model(&entity.DownloadHistory{}).
+		Where("id = ?", id).
+		Updates(map[string]any{"status": status, "torrent_hash": hash})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no entry found with id %d", id)
+	}
+	return nil
+}
+
 func (r *HistoryRepository) UpdateStatusAndPath(ctx context.Context, id uint, status entity.DownloadStatus, filePath string) error {
 	result := r.db.WithContext(ctx).
 		Model(&entity.DownloadHistory{}).
