@@ -2,7 +2,48 @@
 
 A CLI for finding and downloading books. Talks to your self-hosted Prowlarr or Jackett instance, searches across all your configured indexers, and pipes results straight to Deluge. That's it.
 
-Built in Go. Open source.
+Built in Go. Open source. MIT licensed.
+
+---
+
+## install
+
+### from a release (recommended)
+
+Download the latest binary for your platform from the [releases page](https://github.com/intransigent-iconoclast/lamplight-cli/releases).
+
+| platform | archive |
+|----------|---------|
+| Linux (amd64) | `lamplight_vX.X.X_linux_amd64.tar.gz` |
+| macOS (Apple Silicon) | `lamplight_vX.X.X_darwin_arm64.tar.gz` |
+| macOS (Intel) | `lamplight_vX.X.X_darwin_amd64.tar.gz` |
+| Windows (amd64) | `lamplight_vX.X.X_windows_amd64.zip` |
+
+```bash
+# example: linux
+tar xzf lamplight_v*.tar.gz
+sudo mv lamplight /usr/local/bin/
+
+# example: macOS
+tar xzf lamplight_v*.tar.gz
+mv lamplight /usr/local/bin/
+```
+
+### from source
+
+Requires Go 1.24+.
+
+```bash
+go install github.com/intransigent-iconoclast/lamplight-cli@latest
+```
+
+Or clone and build:
+
+```bash
+git clone https://github.com/intransigent-iconoclast/lamplight-cli.git
+cd lamplight-cli
+go build -o lamplight .
+```
 
 ---
 
@@ -200,9 +241,13 @@ The left side is your `--host-path`, the right side is your `--deluge-path`.
 ## building
 
 ```bash
-go build -o target/lamplight
-# or
-./scripts/dev-build.sh
+go build -o lamplight .
+
+# with version info baked in
+go build -ldflags "-X main.version=v0.1.0 -X main.commit=$(git rev-parse --short HEAD) -X main.date=$(date -u +%Y-%m-%dT%H:%M:%SZ)" -o lamplight .
+
+# check it
+./lamplight version
 ```
 
 ---

@@ -1,0 +1,45 @@
+version: 2
+
+# This config is for local use with `goreleaser release --snapshot`.
+# CI releases use the matrix-based workflow in .github/workflows/release.yml
+# to handle CGO cross-compilation via native runners.
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - main: .
+    binary: lamplight
+    env:
+      - CGO_ENABLED=1
+    ldflags:
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.Commit}}
+      - -X main.date={{.Date}}
+
+archives:
+  - format: tar.gz
+    name_template: >-
+      {{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}
+    format_overrides:
+      - goos: windows
+        format: zip
+
+checksum:
+  name_template: "checksums.txt"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+
+release:
+  github:
+    owner: intransigent-iconoclast
+    name: lamplight-cli

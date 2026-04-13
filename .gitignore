@@ -48,6 +48,9 @@ scripts/test-organize.sh
 .claire/
 CLAUDE.md
 
+# goreleaser
+dist/
+
 # provider response dumps
 jackett.xml
 prowlarr.json
