@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
@@ -32,6 +33,13 @@ var syncHistoryCmd = &cobra.Command{
 			return nil
 		}
 
+		// load path translation config (handles docker path mismatch)
+		cfgRepo := repository.NewLibraryConfigRepository(db)
+		cfg, err := cfgRepo.Get(ctx)
+		if err != nil {
+			return fmt.Errorf("load config: %w", err)
+		}
+
 		downloaderClient, _, err := createClient(ctx, db, nil)
 		if err != nil {
 			return fmt.Errorf("connect to downloader: %w", err)
@@ -44,15 +52,18 @@ var syncHistoryCmd = &cobra.Command{
 				continue
 			}
 
+			// translate container path → host path if configured
+			filePath := translatePath(status.FilePath, cfg.DelugePath, cfg.HostPath)
+
 			newStatus, done := delugeStateToStatus(status.State)
 
-			if err := histRepo.UpdateStatusAndPath(ctx, entry.ID, newStatus, status.FilePath); err != nil {
+			if err := histRepo.UpdateStatusAndPath(ctx, entry.ID, newStatus, filePath); err != nil {
 				fmt.Fprintf(out, "  %-40s  couldn't update: %v\n", utils.SmartTruncate(entry.Title, 40), err)
 				continue
 			}
 
 			if done {
-				fmt.Fprintf(out, "  ✓ %-40s  completed → %s\n", utils.SmartTruncate(entry.Title, 40), status.FilePath)
+				fmt.Fprintf(out, "  ✓ %-40s  completed → %s\n", utils.SmartTruncate(entry.Title, 40), filePath)
 			} else {
 				fmt.Fprintf(out, "  ~ %-40s  %s (%.0f%%)\n", utils.SmartTruncate(entry.Title, 40), status.State, status.Progress)
 			}
@@ -75,6 +86,15 @@ func delugeStateToStatus(state string) (entity.DownloadStatus, bool) {
 	default: // Queued, Paused, etc.
 		return entity.StatusSnatched, false
 	}
+}
+
+// translatePath replaces a container path prefix with the real host path.
+// e.g. /data/incomplete/foo → /opt/docker/data/.../downloads/incomplete/foo
+func translatePath(path, delugePath, hostPath string) string {
+	if delugePath == "" || hostPath == "" || !strings.HasPrefix(path, delugePath) {
+		return path
+	}
+	return hostPath + path[len(delugePath):]
 }
 
 func init() {

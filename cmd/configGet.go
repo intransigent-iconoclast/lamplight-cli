@@ -29,6 +29,13 @@ var configGetCmd = &cobra.Command{
 		fmt.Fprintf(out, "library-path  %s\n", cfg.LibraryPath)
 		fmt.Fprintf(out, "template      %s\n", cfg.Template)
 
+		if cfg.DelugePath != "" || cfg.HostPath != "" {
+			fmt.Fprintf(out, "deluge-path   %s\n", cfg.DelugePath)
+			fmt.Fprintf(out, "host-path     %s\n", cfg.HostPath)
+		} else {
+			fmt.Fprintln(out, "deluge-path   (not set — configure if deluge runs in docker)")
+		}
+
 		return nil
 	},
 }

@@ -60,7 +60,27 @@ lamplight provider delete prowlarr
 ### history
 ```bash
 lamplight history list
+lamplight history sync                          # poll deluge, update statuses + file paths
+lamplight history update 3 --status failed      # manually fix a stuck entry
+lamplight history retry 3                       # re-send to deluge, reset to snatched
 lamplight history clear
+```
+
+### organize
+```bash
+lamplight organize                              # process all completed downloads
+lamplight organize ~/Downloads/some-book.epub  # one-off manual file
+lamplight organize --dry-run                   # preview without moving anything
+```
+
+### config
+```bash
+lamplight config get
+lamplight config set --library-path /mnt/media/books
+lamplight config set --template "{author}/{title} ({year})"
+
+# if deluge runs in docker (see below)
+lamplight config set --deluge-path /data --host-path /opt/docker/data/delugevpn/downloads
 ```
 
 ### client (Deluge)
@@ -85,10 +105,43 @@ lamplight provider sync
 # 3. add deluge
 lamplight client add --name deluge --type deluge --host 192.168.0.17 --port 8112 --password your_password
 
-# 4. search and download
+# 4. set your library path
+lamplight config set --library-path /mnt/media/books
+
+# 5. search and download
 lamplight search "consider phlebas" -t epub
 lamplight download 1
+
+# 6. once it's done, sync status then organize
+lamplight history sync
+lamplight organize
 ```
+
+---
+
+## docker path mapping
+
+If Deluge runs in a Docker container, it reports file paths from inside the container — not the real path on your host. This will cause `lamplight organize` to fail because the file doesn't exist at that path.
+
+Fix it by telling lamplight how to translate:
+
+```bash
+lamplight config set \
+  --deluge-path /data \
+  --host-path /opt/docker/data/delugevpn/downloads
+```
+
+So if Deluge says a file is at `/data/incomplete/Some Book/Some Book.epub`, lamplight will look for it at `/opt/docker/data/delugevpn/downloads/incomplete/Some Book/Some Book.epub`.
+
+To find your container's internal path: check your docker-compose volume mount for Deluge. Something like:
+
+```yaml
+volumes:
+  - /opt/docker/data/delugevpn/downloads:/data
+#    ^^^^ host path                        ^^^^ container path
+```
+
+The left side is your `--host-path`, the right side is your `--deluge-path`.
 
 ---
 
