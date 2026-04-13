@@ -92,6 +92,13 @@ use --force to download anyway if you know what you're doing.
 			Timeout: 20 * time.Second,
 		}
 
+		// block re-downloads unless --force is set
+		historyRepo := repository.NewHistoryRepository(db)
+		exists, err := historyRepo.ExistsByLink(ctx, selectedResult.Link)
+		if err == nil && exists && !force {
+			return fmt.Errorf("'%s' is already in your history — use --force to download it again", selectedResult.Title)
+		}
+
 		resolved, err := client.Resolve(ctx, httpClient, selectedResult.Link)
 		if err != nil {
 			return fmt.Errorf("resolve torrent: %w", err)
@@ -108,7 +115,6 @@ use --force to download anyway if you know what you're doing.
 		}
 
 		// Record to history — non-fatal if this fails
-		historyRepo := repository.NewHistoryRepository(db)
 		var sizeBytes int64
 		if selectedResult.SizeBytes != nil {
 			sizeBytes = *selectedResult.SizeBytes

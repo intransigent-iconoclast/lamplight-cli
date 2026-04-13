@@ -260,29 +260,51 @@ func id3SyncsafeInt(b []byte) int {
 }
 
 func id3DecodeText(enc byte, data []byte) string {
-	// strip null terminators
-	for len(data) > 0 && data[len(data)-1] == 0 {
-		data = data[:len(data)-1]
-	}
 	switch enc {
-	case 0x01, 0x02: // UTF-16
+	case 0x01: // UTF-16 with BOM
 		if len(data) < 2 {
 			return ""
 		}
-		// strip BOM if present
+		bigEndian := false
 		if data[0] == 0xFF && data[1] == 0xFE {
-			data = data[2:]
+			data = data[2:] // LE BOM
 		} else if data[0] == 0xFE && data[1] == 0xFF {
-			data = data[2:]
+			data = data[2:] // BE BOM
+			bigEndian = true
 		}
-		runes := make([]rune, 0, len(data)/2)
-		for i := 0; i+1 < len(data); i += 2 {
-			runes = append(runes, rune(binary.LittleEndian.Uint16(data[i:i+2])))
+		// strip UTF-16 null terminator (two zero bytes) before decoding
+		for len(data) >= 2 && data[len(data)-2] == 0 && data[len(data)-1] == 0 {
+			data = data[:len(data)-2]
 		}
-		return string(runes)
+		return decodeUTF16(data, bigEndian)
+	case 0x02: // UTF-16BE without BOM
+		for len(data) >= 2 && data[len(data)-2] == 0 && data[len(data)-1] == 0 {
+			data = data[:len(data)-2]
+		}
+		return decodeUTF16(data, true)
 	default: // 0x00 ISO-8859-1, 0x03 UTF-8
+		for len(data) > 0 && data[len(data)-1] == 0 {
+			data = data[:len(data)-1]
+		}
 		return strings.TrimSpace(string(data))
 	}
+}
+
+func decodeUTF16(data []byte, bigEndian bool) string {
+	if len(data) == 0 {
+		return ""
+	}
+	runes := make([]rune, 0, len(data)/2)
+	for i := 0; i+1 < len(data); i += 2 {
+		var r uint16
+		if bigEndian {
+			r = binary.BigEndian.Uint16(data[i : i+2])
+		} else {
+			r = binary.LittleEndian.Uint16(data[i : i+2])
+		}
+		runes = append(runes, rune(r))
+	}
+	return strings.TrimSpace(string(runes))
 }
 
 // --- M4B (MP4 atoms) ---
@@ -316,19 +338,20 @@ func readM4B(path string, meta *BookMetadata) error {
 		if idx < 0 {
 			continue
 		}
-		// structure: 4-byte size, 4-byte tag, then "data" atom: 4-byte size, "data", 4-byte flags, 4-byte locale, value
+		// atom layout: [parent_size:4][tag:4] → rest starts here
+		//   [data_atom_size:4]["data":4][flags:4][locale:4][value...]
 		rest := data[idx+4:]
 		dataIdx := strings.Index(string(rest[:min(256, len(rest))]), "data")
-		if dataIdx < 0 {
+		if dataIdx < 4 {
+			// need at least 4 bytes before "data" for the size field
 			continue
 		}
+		// the 4 bytes BEFORE "data" are the data atom's size
+		atomSize := int(binary.BigEndian.Uint32(rest[dataIdx-4 : dataIdx]))
+		atomStart := dataIdx - 4
 		valStart := dataIdx + 4 + 4 + 4 // skip "data" + flags + locale
-		if valStart+1 >= len(rest) {
-			continue
-		}
-		atomSize := int(binary.BigEndian.Uint32(rest[dataIdx:dataIdx+4]))
-		valEnd := dataIdx + atomSize
-		if valEnd > len(rest) || valEnd <= valStart {
+		valEnd := atomStart + atomSize
+		if valStart >= len(rest) || valEnd > len(rest) || valEnd <= valStart {
 			continue
 		}
 		*dest = strings.TrimSpace(string(rest[valStart:valEnd]))

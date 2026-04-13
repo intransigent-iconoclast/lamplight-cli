@@ -116,7 +116,10 @@ func (c *DelugeClient) GetTorrentStatus(ctx context.Context, hash string) (*Torr
 
 	s := result.Result
 	filePath := ""
-	if len(s.Files) > 0 {
+	if len(s.Files) > 1 {
+		// multi-file torrent — store the containing folder so organize can handle it as a group
+		filePath = s.SavePath + "/" + s.Name
+	} else if len(s.Files) == 1 {
 		filePath = s.SavePath + "/" + s.Files[0].Path
 	} else if s.Name != "" {
 		filePath = s.SavePath + "/" + s.Name

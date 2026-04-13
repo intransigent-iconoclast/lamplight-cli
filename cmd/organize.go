@@ -86,7 +86,7 @@ Everything else ends up in:
 					filePath = translatePath(filePath, cfg.DelugePath, cfg.HostPath)
 				}
 
-				dest, placed, organizeErr := organizeFile(filePath, libraryPath, cfg.Template, dryRun)
+				dest, placed, organizeErr := organizeEntry(filePath, libraryPath, cfg.Template, dryRun)
 				if organizeErr != nil {
 					fmt.Fprintf(out, "  skip  %s — %v\n", utils.SmartTruncate(entry.Title, 50), organizeErr)
 					continue
@@ -113,27 +113,18 @@ Everything else ends up in:
 			return fmt.Errorf("can't access '%s': %w", inputPath, err)
 		}
 
-		var files []string
-		if info.IsDir() {
-			return fmt.Errorf("organizing a raw directory is no longer supported — use 'lamplight history sync' then 'lamplight organize'")
-		}
-
-		if !bookExtensions[strings.ToLower(filepath.Ext(inputPath))] {
+		if !info.IsDir() && !bookExtensions[strings.ToLower(filepath.Ext(inputPath))] {
 			return fmt.Errorf("'%s' doesn't look like a book file", filepath.Base(inputPath))
 		}
-		files = []string{inputPath}
 
-		for _, file := range files {
-			dest, placed, organizeErr := organizeFile(file, libraryPath, cfg.Template, dryRun)
-			if organizeErr != nil {
-				fmt.Fprintf(out, "  skip  %s — %v\n", filepath.Base(file), organizeErr)
-				continue
-			}
-			if placed == "library" {
-				fmt.Fprintf(out, "  ok    %s\n        → library/%s\n", filepath.Base(file), dest)
-			} else {
-				fmt.Fprintf(out, "  ok    %s\n        → uncategorized/%s\n", filepath.Base(file), filepath.Base(dest))
-			}
+		label := filepath.Base(inputPath)
+		dest, placed, organizeErr := organizeEntry(inputPath, libraryPath, cfg.Template, dryRun)
+		if organizeErr != nil {
+			fmt.Fprintf(out, "  skip  %s — %v\n", label, organizeErr)
+		} else if placed == "library" {
+			fmt.Fprintf(out, "  ok    %s\n        → library/%s\n", label, dest)
+		} else {
+			fmt.Fprintf(out, "  ok    %s\n        → uncategorized/%s\n", label, filepath.Base(dest))
 		}
 
 		return nil
@@ -166,6 +157,14 @@ func organizeFile(src, libraryRoot, tmpl string, dryRun bool) (string, string, e
 	destFile := filepath.Join(destDir, filepath.Base(relPath))
 	destFile = resolveConflict(destFile)
 
+	// re-derive relPath from the actual destination after conflict resolution —
+	// if _2 was appended, the original relPath would be wrong in history and output
+	if placed == "library" {
+		relPath = strings.TrimPrefix(destFile, filepath.Join(libraryRoot, "library")+string(filepath.Separator))
+	} else {
+		relPath = filepath.Base(destFile)
+	}
+
 	if dryRun {
 		return relPath, placed, nil
 	}
@@ -181,6 +180,102 @@ func organizeFile(src, libraryRoot, tmpl string, dryRun bool) (string, string, e
 	return relPath, placed, nil
 }
 
+// organizeEntry dispatches to organizeDir or organizeFile depending on what src is.
+func organizeEntry(src, libraryRoot, tmpl string, dryRun bool) (string, string, error) {
+	info, err := os.Stat(src)
+	if err != nil {
+		return "", "", fmt.Errorf("can't access '%s': %w", filepath.Base(src), err)
+	}
+	if info.IsDir() {
+		return organizeDir(src, libraryRoot, tmpl, dryRun)
+	}
+	return organizeFile(src, libraryRoot, tmpl, dryRun)
+}
+
+// organizeDir handles a folder of book files (e.g. an audiobook split into chapters,
+// or a comic series). Single-file folders are unwrapped and treated as a plain file.
+// Multi-file folders are moved as a group into library/{template}/ or uncategorized/{folder-name}/.
+func organizeDir(src, libraryRoot, tmpl string, dryRun bool) (string, string, error) {
+	files, err := collectBookFiles(src)
+	if err != nil {
+		return "", "", fmt.Errorf("scan directory: %w", err)
+	}
+	if len(files) == 0 {
+		return "", "", fmt.Errorf("no book files found inside")
+	}
+
+	// single file in a folder — unwrap it, no need for a subdirectory
+	if len(files) == 1 {
+		return organizeFile(files[0], libraryRoot, tmpl, dryRun)
+	}
+
+	// multiple files — pick the best metadata candidate to name the destination folder
+	meta := bestMetadata(files)
+
+	var destDir, relPath, placed string
+	if utils.IsComplete(meta) {
+		relPath = utils.ApplyTemplate(tmpl, meta)
+		destDir = filepath.Join(libraryRoot, "library", relPath)
+		placed = "library"
+	} else {
+		relPath = filepath.Base(src)
+		destDir = filepath.Join(libraryRoot, "uncategorized", relPath)
+		placed = "uncategorized"
+	}
+
+	destDir = resolveConflictDir(destDir)
+
+	if dryRun {
+		return relPath, placed, nil
+	}
+
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return "", "", fmt.Errorf("create directory: %w", err)
+	}
+
+	for _, f := range files {
+		dst := filepath.Join(destDir, filepath.Base(f))
+		if err := moveFile(f, dst); err != nil {
+			return "", "", fmt.Errorf("move %s: %w", filepath.Base(f), err)
+		}
+	}
+
+	// clean up the source directory — RemoveAll handles nested subdirs left
+	// behind by torrent clients (os.Remove would silently fail on non-empty dirs)
+	_ = os.RemoveAll(src)
+
+	return relPath, placed, nil
+}
+
+// bestMetadata picks the most useful metadata from a list of files.
+// Prefers audio files for audiobooks (chapter files share the same album/book tags),
+// then returns the first candidate with complete metadata, falling back to whatever the first file has.
+func bestMetadata(files []string) *utils.BookMetadata {
+	audioExts := map[string]bool{".mp3": true, ".m4b": true, ".m4a": true}
+
+	candidates := files
+	var audioFiles []string
+	for _, f := range files {
+		if audioExts[strings.ToLower(filepath.Ext(f))] {
+			audioFiles = append(audioFiles, f)
+		}
+	}
+	if len(audioFiles) > 0 {
+		candidates = audioFiles
+	}
+
+	for _, f := range candidates {
+		meta, err := utils.ReadMetadata(f)
+		if err == nil && utils.IsComplete(meta) {
+			return meta
+		}
+	}
+
+	// nothing complete — return whatever the first file gives us
+	meta, _ := utils.ReadMetadata(candidates[0])
+	return meta
+}
+
 // resolveConflict appends _2, _3, … to the stem if the path already exists.
 func resolveConflict(path string) string {
 	if _, err := os.Stat(path); os.IsNotExist(err) {
@@ -190,6 +285,20 @@ func resolveConflict(path string) string {
 	stem := strings.TrimSuffix(path, ext)
 	for i := 2; i < 100; i++ {
 		candidate := fmt.Sprintf("%s_%d%s", stem, i, ext)
+		if _, err := os.Stat(candidate); os.IsNotExist(err) {
+			return candidate
+		}
+	}
+	return path
+}
+
+// resolveConflictDir appends _2, _3, … to the directory name if it already exists.
+func resolveConflictDir(path string) string {
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		return path
+	}
+	for i := 2; i < 100; i++ {
+		candidate := fmt.Sprintf("%s_%d", path, i)
 		if _, err := os.Stat(candidate); os.IsNotExist(err) {
 			return candidate
 		}
