@@ -73,7 +73,8 @@ Everything else ends up in:
 			}
 
 			if len(completed) == 0 {
-				fmt.Fprintln(out, "No completed downloads to organize. Run 'lamplight history sync' first.")
+				fmt.Fprintln(out, "no completed downloads to organize.")
+				fmt.Fprintln(out, "run 'lamplight history sync' to check if anything has finished.")
 				return nil
 			}
 

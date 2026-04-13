@@ -30,15 +30,26 @@ const (
 // This function works by taking a lambda that converts the type to a list of strings
 func PrintOutput[T any](out io.Writer, headers string, data []T, row func(T) []string) error {
 	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-
-	// print out the headers
 	fmt.Fprintln(w, headers)
-
 	for i, it := range data {
-		// print out the row utilizing the "row" function to convert the type to a []string
 		fmt.Fprintln(w, strconv.Itoa(i+1)+"\t"+strings.Join(row(it), "\t"))
 	}
+	return w.Flush()
+}
 
+// PrintOutputWithIndices is like PrintOutput but uses the provided indices
+// instead of auto-generating them — useful when showing a filtered subset
+// so the index still matches the full list for use with other commands.
+func PrintOutputWithIndices[T any](out io.Writer, headers string, data []T, indices []int, row func(T) []string) error {
+	w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(w, headers)
+	for i, it := range data {
+		idx := i + 1
+		if i < len(indices) {
+			idx = indices[i]
+		}
+		fmt.Fprintln(w, strconv.Itoa(idx)+"\t"+strings.Join(row(it), "\t"))
+	}
 	return w.Flush()
 }
 

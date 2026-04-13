@@ -15,6 +15,8 @@ var listHistoryCmd = &cobra.Command{
 	Short: "show your download history.",
 	Long: `list all downloads. filter by status or search by title.
 
+the index shown is always the global index — use it directly with retry or update.
+
   lamplight history list
   lamplight history list --filter failed
   lamplight history list "memory of blood"
@@ -31,36 +33,43 @@ var listHistoryCmd = &cobra.Command{
 
 		repo := repository.NewHistoryRepository(db)
 
-		var entries []entity.DownloadHistory
-		if filterStatus != "" {
-			entries, err = repo.FindByStatus(ctx, entity.DownloadStatus(filterStatus))
-		} else {
-			entries, err = repo.FindAll(ctx)
-		}
+		// always load full list so indices stay accurate for retry/update
+		all, err := repo.FindAll(ctx)
 		if err != nil {
 			return fmt.Errorf("load history: %w", err)
 		}
 
-		// fuzzy title filter
-		if len(args) > 0 {
-			query := strings.ToLower(args[0])
-			var matched []entity.DownloadHistory
-			for _, e := range entries {
-				if strings.Contains(strings.ToLower(e.Title), query) {
-					matched = append(matched, e)
-				}
+		type indexed struct {
+			globalIdx int
+			entry     entity.DownloadHistory
+		}
+
+		var rows []indexed
+		for i, e := range all {
+			if filterStatus != "" && string(e.Status) != filterStatus {
+				continue
 			}
-			entries = matched
+			if len(args) > 0 && !strings.Contains(strings.ToLower(e.Title), strings.ToLower(args[0])) {
+				continue
+			}
+			rows = append(rows, indexed{i + 1, e})
 		}
 
 		out := cmd.OutOrStdout()
 
-		if len(entries) == 0 {
+		if len(rows) == 0 {
 			fmt.Fprintln(out, "no entries found.")
 			return nil
 		}
 
-		utils.PrintOutput(out, string(utils.HISTORY), entries, func(e entity.DownloadHistory) []string {
+		entries := make([]entity.DownloadHistory, len(rows))
+		indices := make([]int, len(rows))
+		for i, r := range rows {
+			entries[i] = r.entry
+			indices[i] = r.globalIdx
+		}
+
+		utils.PrintOutputWithIndices(out, string(utils.HISTORY), entries, indices, func(e entity.DownloadHistory) []string {
 			return []string{
 				utils.CleanString(e.Title),
 				e.IndexerName,

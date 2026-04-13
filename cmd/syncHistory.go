@@ -29,7 +29,7 @@ var syncHistoryCmd = &cobra.Command{
 		}
 
 		if len(active) == 0 {
-			fmt.Fprintln(out, "Nothing active to sync.")
+			fmt.Fprintln(out, "nothing active to sync.")
 			return nil
 		}
 
@@ -40,9 +40,14 @@ var syncHistoryCmd = &cobra.Command{
 			return fmt.Errorf("load config: %w", err)
 		}
 
-		downloaderClient, _, err := createClient(ctx, db, nil)
+		downloaderClient, clientDetails, err := createClient(ctx, db, nil)
 		if err != nil {
 			return fmt.Errorf("connect to downloader: %w", err)
+		}
+
+		// verify we can actually reach Deluge before looping through everything
+		if err := downloaderClient.Authenticate(ctx); err != nil {
+			return fmt.Errorf("can't reach Deluge at %s:%d — %w", clientDetails.Host, clientDetails.Port, err)
 		}
 
 		for _, entry := range active {
