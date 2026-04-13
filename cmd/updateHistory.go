@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"strconv"
 
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
@@ -17,17 +18,24 @@ var validStatuses = []entity.DownloadStatus{
 }
 
 var updateHistoryCmd = &cobra.Command{
-	Use:   "update <index|title>",
+	Use:   "update <index>",
 	Short: "manually fix the status of a download.",
-	Long: `set the status of a download entry by index or title fragment.
+	Long: `set the status on a download by its index number.
 
-  lamplight history update 3 --status failed
-  lamplight history update "memory of blood" --status failed
+use --filter to narrow the list first so the numbers stay small:
+
+  lamplight history list --filter failed
+  lamplight history update 1 --filter failed --status snatched
 
 valid statuses: snatched, downloading, completed, failed`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
+
+		index, err := strconv.Atoi(args[0])
+		if err != nil || index <= 0 {
+			return fmt.Errorf("invalid index '%s': must be a positive number", args[0])
+		}
 
 		newStatus, _ := cmd.Flags().GetString("status")
 		if newStatus == "" {
@@ -65,10 +73,11 @@ valid statuses: snatched, downloading, completed, failed`,
 			return fmt.Errorf("load history: %w", err)
 		}
 
-		target, err := resolveHistoryEntry(args[0], repo, entries)
-		if err != nil {
-			return err
+		if index > len(entries) {
+			return fmt.Errorf("index %d out of range (showing %d entries)", index, len(entries))
 		}
+
+		target := entries[index-1]
 
 		if err := repo.UpdateStatus(ctx, target.ID, status); err != nil {
 			return fmt.Errorf("update status: %w", err)

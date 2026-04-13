@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/intransigent-iconoclast/lamplight-cli/internal/client"
@@ -13,16 +14,11 @@ import (
 )
 
 var retryHistoryCmd = &cobra.Command{
-	Use:   "retry <index|title>",
+	Use:   "retry <index>",
 	Short: "re-send a stuck or failed download to Deluge.",
 	Long: `re-sends the torrent to Deluge and saves the new hash so 'history sync' can track it.
 
-select by index or title fragment:
-
-  lamplight history retry 3
-  lamplight history retry "memory of blood"
-
-pair with --filter to narrow the list first:
+use --filter to narrow the list first so the numbers stay small:
 
   lamplight history list --filter failed
   lamplight history retry 1 --filter failed`,
@@ -30,6 +26,12 @@ pair with --filter to narrow the list first:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		ctx := cmd.Context()
 		out := cmd.OutOrStdout()
+
+		index, err := strconv.Atoi(args[0])
+		if err != nil || index <= 0 {
+			return fmt.Errorf("invalid index '%s': must be a positive number", args[0])
+		}
+
 		filterStatus, _ := cmd.Flags().GetString("filter")
 
 		db, err := utils.Open("lamplight-cli", false)
@@ -49,10 +51,11 @@ pair with --filter to narrow the list first:
 			return fmt.Errorf("load history: %w", err)
 		}
 
-		target, err := resolveHistoryEntry(args[0], histRepo, entries)
-		if err != nil {
-			return err
+		if index > len(entries) {
+			return fmt.Errorf("index %d out of range (showing %d entries)", index, len(entries))
 		}
+
+		target := entries[index-1]
 
 		fmt.Fprintf(out, "retrying: %s\n", target.Title)
 
