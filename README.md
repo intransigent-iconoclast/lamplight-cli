@@ -139,6 +139,12 @@ library/
       02.mp3
 ```
 
+if you set `--audiobook-path`, audiobooks go to a completely separate root:
+```
+/mnt/media/books/library/Frank Herbert/Dune (1965).epub
+/mnt/media/audiobooks/library/Frank Herbert/Dune (1965)/01.mp3
+```
+
 if a filename already exists, lamplight appends `_2`, `_3`, etc rather than overwriting.
 
 **metadata sources**, in order of preference:
@@ -153,9 +159,14 @@ lamplight config get
 lamplight config set --library-path /mnt/media/books
 lamplight config set --template "{author}/{title} ({year})"
 
+# keep audiobooks separate from books (optional)
+lamplight config set --audiobook-path /mnt/media/audiobooks
+
 # if deluge runs in docker (see below)
 lamplight config set --deluge-path /data --host-path /opt/docker/data/delugevpn/downloads
 ```
+
+if `--audiobook-path` is set, mp3/m4b/m4a files get organized there instead of `--library-path`. if it's not set, everything goes to the same place like before.
 
 available template tokens: `{author}`, `{title}`, `{year}`, `{publisher}`, `{isbn}`, `{format}`
 

@@ -63,13 +63,13 @@ func TestOrganizeEntry_FileRouted_ToOrganizeFile(t *testing.T) {
 	src := filepath.Join(t.TempDir(), "mystery_book_no_author.pdf")
 	require.NoError(t, os.WriteFile(src, []byte{}, 0o644))
 
-	_, placed, err := organizeEntry(src, libraryRoot, "{author}/{title}", false)
+	_, placed, err := organizeEntry(src, libraryRoot, "", "{author}/{title}", false)
 	require.NoError(t, err)
 	assert.Equal(t, "uncategorized", placed)
 }
 
 func TestOrganizeEntry_NonExistentPath_ReturnsError(t *testing.T) {
-	_, _, err := organizeEntry("/tmp/does-not-exist.epub", t.TempDir(), "{author}/{title}", false)
+	_, _, err := organizeEntry("/tmp/does-not-exist.epub", t.TempDir(), "", "{author}/{title}", false)
 	assert.Error(t, err)
 }
 
@@ -80,7 +80,7 @@ func TestOrganizeFile_IncompleteMetadata_GoesToUncategorized(t *testing.T) {
 	src := filepath.Join(t.TempDir(), "mystery.epub")
 	require.NoError(t, os.WriteFile(src, []byte("not a real epub"), 0o644))
 
-	_, placed, err := organizeFile(src, libraryRoot, "{author}/{title}", false)
+	_, placed, err := organizeFile(src, libraryRoot, "", "{author}/{title}", false)
 	require.NoError(t, err)
 	assert.Equal(t, "uncategorized", placed)
 	_, statErr := os.Stat(filepath.Join(libraryRoot, "uncategorized", "mystery.epub"))
@@ -91,7 +91,7 @@ func TestOrganizeFile_CompleteMetadata_GoesToLibrary(t *testing.T) {
 	libraryRoot := t.TempDir()
 	src := makeOrganizeEPUB(t, "Dune", "Frank Herbert", "1965")
 
-	relPath, placed, err := organizeFile(src, libraryRoot, "{author}/{title} ({year})", false)
+	relPath, placed, err := organizeFile(src, libraryRoot, "", "{author}/{title} ({year})", false)
 	require.NoError(t, err)
 	assert.Equal(t, "library", placed)
 	// relPath includes the extension
@@ -104,7 +104,7 @@ func TestOrganizeFile_DryRun_DoesNotMoveFile(t *testing.T) {
 	libraryRoot := t.TempDir()
 	src := makeOrganizeEPUB(t, "Dune", "Frank Herbert", "1965")
 
-	_, _, err := organizeFile(src, libraryRoot, "{author}/{title} ({year})", true)
+	_, _, err := organizeFile(src, libraryRoot, "", "{author}/{title} ({year})", true)
 	require.NoError(t, err)
 	// source must still exist
 	_, statErr := os.Stat(src)
@@ -120,12 +120,12 @@ func TestOrganizeFile_ConflictResolved(t *testing.T) {
 
 	// organize first copy
 	src1 := makeOrganizeEPUB(t, "Dune", "Frank Herbert", "1965")
-	_, _, err := organizeFile(src1, libraryRoot, tmpl, false)
+	_, _, err := organizeFile(src1, libraryRoot, "", tmpl, false)
 	require.NoError(t, err)
 
 	// organize second copy — should get _2 suffix
 	src2 := makeOrganizeEPUB(t, "Dune", "Frank Herbert", "1965")
-	relPath2, _, err := organizeFile(src2, libraryRoot, tmpl, false)
+	relPath2, _, err := organizeFile(src2, libraryRoot, "", tmpl, false)
 	require.NoError(t, err)
 
 	// relPath must reflect the actual _2 file, not the original name
@@ -143,7 +143,7 @@ func TestOrganizeDir_SingleFile_Unwrapped(t *testing.T) {
 	epubPath := makeOrganizeEPUBInDir(t, srcDir, "test.epub", "Dune", "Frank Herbert", "1965")
 	_ = epubPath
 
-	_, placed, err := organizeDir(srcDir, libraryRoot, "{author}/{title} ({year})", false)
+	_, placed, err := organizeDir(srcDir, libraryRoot, "", "{author}/{title} ({year})", false)
 	require.NoError(t, err)
 	assert.Equal(t, "library", placed)
 	// file exists flat, not in a subfolder
@@ -155,7 +155,7 @@ func TestOrganizeDir_NoBookFiles_ReturnsError(t *testing.T) {
 	srcDir := t.TempDir()
 	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "notes.txt"), []byte{}, 0o644))
 
-	_, _, err := organizeDir(srcDir, t.TempDir(), "{author}/{title}", false)
+	_, _, err := organizeDir(srcDir, t.TempDir(), "", "{author}/{title}", false)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "no book files")
 }
@@ -168,7 +168,7 @@ func TestOrganizeDir_MultipleAudioFiles_StaysTogether(t *testing.T) {
 	makeOrganizeMP3InDir(t, srcDir, "01.mp3", "Dune", "Frank Herbert", "1965")
 	makeOrganizeMP3InDir(t, srcDir, "02.mp3", "Dune", "Frank Herbert", "1965")
 
-	relPath, placed, err := organizeDir(srcDir, libraryRoot, "{author}/{title} ({year})", false)
+	relPath, placed, err := organizeDir(srcDir, libraryRoot, "", "{author}/{title} ({year})", false)
 	require.NoError(t, err)
 	assert.Equal(t, "library", placed)
 	assert.Equal(t, "Frank Herbert/Dune (1965)", relPath)
@@ -188,7 +188,7 @@ func TestOrganizeDir_MultipleFiles_IncompleteMetadata_GoesToUncategorized(t *tes
 	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "chapter01.mp3"), []byte(""), 0o644))
 	require.NoError(t, os.WriteFile(filepath.Join(srcDir, "chapter02.mp3"), []byte(""), 0o644))
 
-	_, placed, err := organizeDir(srcDir, libraryRoot, "{author}/{title}", false)
+	_, placed, err := organizeDir(srcDir, libraryRoot, "", "{author}/{title}", false)
 	require.NoError(t, err)
 	assert.Equal(t, "uncategorized", placed)
 }
@@ -200,7 +200,7 @@ func TestOrganizeDir_SourceRemovedAfterMove(t *testing.T) {
 	makeOrganizeMP3InDir(t, srcDir, "01.mp3", "Dune", "Frank Herbert", "1965")
 	makeOrganizeMP3InDir(t, srcDir, "02.mp3", "Dune", "Frank Herbert", "1965")
 
-	_, _, err := organizeDir(srcDir, libraryRoot, "{author}/{title} ({year})", false)
+	_, _, err := organizeDir(srcDir, libraryRoot, "", "{author}/{title} ({year})", false)
 	require.NoError(t, err)
 
 	// source directory should be gone
@@ -219,7 +219,7 @@ func TestOrganizeDir_SourceRemovedEvenWithSubdirs(t *testing.T) {
 	makeOrganizeMP3InDir(t, srcDir, "01.mp3", "Dune", "Frank Herbert", "1965")
 	makeOrganizeMP3InDir(t, srcDir, "02.mp3", "Dune", "Frank Herbert", "1965")
 
-	_, _, err := organizeDir(srcDir, libraryRoot, "{author}/{title} ({year})", false)
+	_, _, err := organizeDir(srcDir, libraryRoot, "", "{author}/{title} ({year})", false)
 	require.NoError(t, err)
 
 	_, statErr := os.Stat(srcDir)
@@ -233,7 +233,7 @@ func TestOrganizeDir_DryRun_DoesNotMove(t *testing.T) {
 	makeOrganizeMP3InDir(t, srcDir, "01.mp3", "Dune", "Frank Herbert", "1965")
 	makeOrganizeMP3InDir(t, srcDir, "02.mp3", "Dune", "Frank Herbert", "1965")
 
-	_, _, err := organizeDir(srcDir, libraryRoot, "{author}/{title} ({year})", true)
+	_, _, err := organizeDir(srcDir, libraryRoot, "", "{author}/{title} ({year})", true)
 	require.NoError(t, err)
 
 	// source files still exist
@@ -245,6 +245,68 @@ func TestOrganizeDir_DryRun_DoesNotMove(t *testing.T) {
 	// nothing in library
 	_, statErr := os.Stat(filepath.Join(libraryRoot, "library"))
 	assert.True(t, os.IsNotExist(statErr))
+}
+
+// --- audiobook path routing ---
+
+func TestOrganizeFile_AudiobookPath_RoutesMP3(t *testing.T) {
+	libraryRoot := t.TempDir()
+	audiobookRoot := t.TempDir()
+	src := makeOrganizeMP3InDir(t, t.TempDir(), "book.mp3", "Dune", "Frank Herbert", "1965")
+
+	relPath, placed, err := organizeFile(src, libraryRoot, audiobookRoot, "{author}/{title} ({year})", false)
+	require.NoError(t, err)
+	assert.Equal(t, "library", placed)
+	assert.Equal(t, "Frank Herbert/Dune (1965).mp3", relPath)
+	// should be in the audiobook root, not the library root
+	_, statErr := os.Stat(filepath.Join(audiobookRoot, "library", "Frank Herbert", "Dune (1965).mp3"))
+	assert.NoError(t, statErr)
+	// should NOT be in the library root
+	_, statErr = os.Stat(filepath.Join(libraryRoot, "library", "Frank Herbert", "Dune (1965).mp3"))
+	assert.True(t, os.IsNotExist(statErr))
+}
+
+func TestOrganizeFile_AudiobookPath_EPUBStaysInLibrary(t *testing.T) {
+	libraryRoot := t.TempDir()
+	audiobookRoot := t.TempDir()
+	src := makeOrganizeEPUB(t, "Dune", "Frank Herbert", "1965")
+
+	_, placed, err := organizeFile(src, libraryRoot, audiobookRoot, "{author}/{title} ({year})", false)
+	require.NoError(t, err)
+	assert.Equal(t, "library", placed)
+	// should be in library root, not audiobook root
+	_, statErr := os.Stat(filepath.Join(libraryRoot, "library", "Frank Herbert", "Dune (1965).epub"))
+	assert.NoError(t, statErr)
+}
+
+func TestOrganizeDir_AudiobookPath_RoutesAudioDir(t *testing.T) {
+	libraryRoot := t.TempDir()
+	audiobookRoot := t.TempDir()
+	srcDir := t.TempDir()
+
+	makeOrganizeMP3InDir(t, srcDir, "01.mp3", "Dune", "Frank Herbert", "1965")
+	makeOrganizeMP3InDir(t, srcDir, "02.mp3", "Dune", "Frank Herbert", "1965")
+
+	_, placed, err := organizeDir(srcDir, libraryRoot, audiobookRoot, "{author}/{title} ({year})", false)
+	require.NoError(t, err)
+	assert.Equal(t, "library", placed)
+	// should be in audiobook root
+	_, err1 := os.Stat(filepath.Join(audiobookRoot, "library", "Frank Herbert", "Dune (1965)", "01.mp3"))
+	_, err2 := os.Stat(filepath.Join(audiobookRoot, "library", "Frank Herbert", "Dune (1965)", "02.mp3"))
+	assert.NoError(t, err1)
+	assert.NoError(t, err2)
+}
+
+func TestOrganizeFile_NoAudiobookPath_AudioGoesToLibrary(t *testing.T) {
+	libraryRoot := t.TempDir()
+	src := makeOrganizeMP3InDir(t, t.TempDir(), "book.mp3", "Dune", "Frank Herbert", "1965")
+
+	// empty audiobook path — should fall back to library root
+	_, placed, err := organizeFile(src, libraryRoot, "", "{author}/{title} ({year})", false)
+	require.NoError(t, err)
+	assert.Equal(t, "library", placed)
+	_, statErr := os.Stat(filepath.Join(libraryRoot, "library", "Frank Herbert", "Dune (1965).mp3"))
+	assert.NoError(t, statErr)
 }
 
 // --- helpers ---
