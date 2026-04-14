@@ -26,14 +26,20 @@ var configGetCmd = &cobra.Command{
 		}
 
 		out := cmd.OutOrStdout()
-		fmt.Fprintf(out, "library-path  %s\n", cfg.LibraryPath)
-		fmt.Fprintf(out, "template      %s\n", cfg.Template)
+		fmt.Fprintf(out, "library-path     %s\n", cfg.LibraryPath)
+		fmt.Fprintf(out, "template         %s\n", cfg.Template)
+
+		if cfg.AudiobookPath != "" {
+			fmt.Fprintf(out, "audiobook-path   %s\n", cfg.AudiobookPath)
+		} else {
+			fmt.Fprintln(out, "audiobook-path   (not set — audiobooks go into library-path)")
+		}
 
 		if cfg.DelugePath != "" || cfg.HostPath != "" {
-			fmt.Fprintf(out, "deluge-path   %s\n", cfg.DelugePath)
-			fmt.Fprintf(out, "host-path     %s\n", cfg.HostPath)
+			fmt.Fprintf(out, "deluge-path      %s\n", cfg.DelugePath)
+			fmt.Fprintf(out, "host-path        %s\n", cfg.HostPath)
 		} else {
-			fmt.Fprintln(out, "deluge-path   (not set — configure if deluge runs in docker)")
+			fmt.Fprintln(out, "deluge-path      (not set — configure if deluge runs in docker)")
 		}
 
 		return nil

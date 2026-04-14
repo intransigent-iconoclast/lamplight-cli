@@ -41,6 +41,6 @@ func (r *LibraryConfigRepository) Save(ctx context.Context, cfg *entity.LibraryC
 	cfg.ID = 1
 	return r.db.WithContext(ctx).Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"library_path", "template", "deluge_path", "host_path"}),
+		DoUpdates: clause.AssignmentColumns([]string{"library_path", "template", "audiobook_path", "deluge_path", "host_path"}),
 	}).Create(cfg).Error
 }
