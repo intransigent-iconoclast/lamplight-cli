@@ -25,7 +25,11 @@ lamplight is a frontend — it needs these self-hosted services running before i
 
 ### Optional but recommended
 
-**[Calibre](https://calibre-ebook.com/)** — not required to run lamplight, but if you manage your library with Calibre the default template `{author}/{title}/{title} - {author}` matches Calibre's folder layout so they play nicely together.
+**[Calibre](https://calibre-ebook.com/)** — not required to run lamplight, but if you manage your library with Calibre you can set the template to match Calibre's folder layout so they play nicely together:
+
+```bash
+lamplight config set --template "{author}/{title}/{title} - {author}"
+```
 
 ---
 
