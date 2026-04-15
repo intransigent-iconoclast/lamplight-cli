@@ -24,7 +24,7 @@ var syncHistoryCmd = &cobra.Command{
 
   lamplight history sync
 
-use --watch / -w to get a live view that refreshes every 3 seconds:
+use --watch / -w to get a live view that refreshes every second:
 
   lamplight history sync -w
 
@@ -66,7 +66,7 @@ press Ctrl+C to exit watch mode.`,
 		defer stop()
 
 		prevLines := 0
-		ticker := time.NewTicker(3 * time.Second)
+		ticker := time.NewTicker(1 * time.Second)
 		defer ticker.Stop()
 
 		// initial draw
@@ -121,7 +121,7 @@ func doSync(
 	lines := 0
 
 	if watchMode {
-		header := fmt.Sprintf("  watching %d download(s) — updated %s — Ctrl+C to stop\n\n",
+		header := fmt.Sprintf("  watching %d download(s) — %s — Ctrl+C to stop\n\n",
 			len(active), time.Now().Format("15:04:05"))
 		fmt.Fprint(out, header)
 		lines += 2
