@@ -2,7 +2,30 @@
 
 A CLI for finding and downloading books. Talks to your self-hosted Prowlarr or Jackett instance, searches across all your configured indexers, and pipes results straight to Deluge. That's it.
 
-Built in Go. Open source.
+Built in Go. Open source. MIT licensed.
+
+---
+
+## requirements
+
+lamplight is a frontend — it needs these self-hosted services running before it can do anything:
+
+### required
+
+**[Deluge](https://deluge-torrent.org/)** — the download client. lamplight sends torrents here and polls it for status.
+- needs the web UI enabled (Settings → Interface → Enable Web Interface)
+- default port: `8112`
+- works fine in Docker — see [docker path mapping](#docker-path-mapping) if your paths differ
+
+**[Prowlarr](https://github.com/Prowlarr/Prowlarr) or [Jackett](https://github.com/Jackett/Jackett)** — the indexer manager. lamplight queries this to search across all your configured torrent indexers.
+- Prowlarr is recommended (actively maintained, better API)
+- Jackett works too
+- you need at least one book-supporting indexer configured (e.g. Libgen, MyAnonaMouse, IPTorrents)
+- default Prowlarr port: `9696` — default Jackett port: `9117`
+
+### optional but recommended
+
+**[Calibre](https://calibre-ebook.com/)** — not required to run lamplight, but if you manage your library with Calibre the default template `{author}/{title}/{title} - {author}` matches Calibre's folder layout so they play nicely together.
 
 ---
 
@@ -55,13 +78,16 @@ lamplight history list "dune"                     # search by title (substring)
 lamplight history list "herbert" --filter completed
 
 lamplight history sync                            # poll deluge for status updates
+lamplight history sync -w                         # live progress view, refreshes every second
 lamplight history retry 3                         # re-send entry #3 to deluge
 lamplight history retry --all-failed              # re-send everything that failed at once
+lamplight history cancel 3                        # remove from deluge and history
+lamplight history cancel 3 --delete-data          # same, but also deletes files from disk
 lamplight history update 3 --status failed        # manually fix a stuck entry
 lamplight history clear
 ```
 
-the index shown in `history list` is always the global index — use it directly with `retry` or `update` even when filtering.
+the index shown in `history list` is always the global index — use it directly with `retry`, `update`, or `cancel` even when filtering.
 
 ### organize
 ```bash
