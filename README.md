@@ -6,36 +6,36 @@ Built in Go. Open source. MIT licensed.
 
 ---
 
-## requirements
+## Requirements
 
 lamplight is a frontend — it needs these self-hosted services running before it can do anything:
 
-### required
+### Required
 
 **[Deluge](https://deluge-torrent.org/)** — the download client. lamplight sends torrents here and polls it for status.
-- needs the web UI enabled (Settings → Interface → Enable Web Interface)
-- default port: `8112`
-- works fine in Docker — see [docker path mapping](#docker-path-mapping) if your paths differ
+- Needs the web UI enabled (Settings → Interface → Enable Web Interface)
+- Default port: `8112`
+- Works fine in Docker — see [Docker path mapping](#docker-path-mapping) if your paths differ
 
 **[Prowlarr](https://github.com/Prowlarr/Prowlarr) or [Jackett](https://github.com/Jackett/Jackett)** — the indexer manager. lamplight queries this to search across all your configured torrent indexers.
 - Prowlarr is recommended (actively maintained, better API)
 - Jackett works too
-- you need at least one book-supporting indexer configured (e.g. Libgen, MyAnonaMouse, IPTorrents)
-- default Prowlarr port: `9696` — default Jackett port: `9117`
+- You need at least one book-supporting indexer configured (e.g. Libgen, MyAnonaMouse, IPTorrents)
+- Default Prowlarr port: `9696` — default Jackett port: `9117`
 
-### optional but recommended
+### Optional but recommended
 
 **[Calibre](https://calibre-ebook.com/)** — not required to run lamplight, but if you manage your library with Calibre the default template `{author}/{title}/{title} - {author}` matches Calibre's folder layout so they play nicely together.
 
 ---
 
-## install
+## Install
 
-### from a release (recommended)
+### From a release (recommended)
 
 Download the latest binary for your platform from the [releases page](https://github.com/intransigent-iconoclast/lamplight-cli/releases).
 
-| platform | archive |
+| Platform | Archive |
 |----------|---------|
 | Linux (amd64) | `lamplight_vX.X.X_linux_amd64.tar.gz` |
 | macOS (Apple Silicon) | `lamplight_vX.X.X_darwin_arm64.tar.gz` |
@@ -43,16 +43,16 @@ Download the latest binary for your platform from the [releases page](https://gi
 | Windows (amd64) | `lamplight_vX.X.X_windows_amd64.zip` |
 
 ```bash
-# example: linux
+# Example: Linux
 tar xzf lamplight_v*.tar.gz
 sudo mv lamplight /usr/local/bin/
 
-# example: macOS
+# Example: macOS
 tar xzf lamplight_v*.tar.gz
 mv lamplight /usr/local/bin/
 ```
 
-### from source
+### From source
 
 Requires Go 1.24+.
 
@@ -70,7 +70,7 @@ go build -o lamplight .
 
 ---
 
-## what it does
+## What it does
 
 - Search for books across multiple torrent indexers at once
 - Filter results by format — epub, pdf, mobi, audiobook, comic, or just `book` to catch all prose formats
@@ -83,7 +83,7 @@ go build -o lamplight .
 
 ---
 
-## commands
+## Commands
 
 ### search
 ```bash
@@ -93,13 +93,13 @@ lamplight search "one piece" -t comic -s seeders
 lamplight search "stephen king" -t book,audiobook -l 100
 ```
 
-| flag | what it does |
+| Flag | What it does |
 |------|-------------|
-| `-l` | how many results to fetch (default 15, use 0 for no limit) |
-| `-t` | filter by type: `book`, `epub`, `pdf`, `mobi`, `audiobook`, `comic`, `unknown`, `all` — comma-separated works |
-| `-s` | sort by: `seeders` (default), `leechers`, `size`, `title` |
-| `-b` | book category filter, on by default |
-| `-i` | search a specific indexer by index |
+| `-l` | How many results to fetch (default 15, use 0 for no limit) |
+| `-t` | Filter by type: `book`, `epub`, `pdf`, `mobi`, `audiobook`, `comic`, `unknown`, `all` — comma-separated works |
+| `-s` | Sort by: `seeders` (default), `leechers`, `size`, `title` |
+| `-b` | Book category filter, on by default |
+| `-i` | Search a specific indexer by index |
 
 Results are cached for 30 minutes. After that you'll need to re-run your search.
 
@@ -109,7 +109,7 @@ lamplight download 3            # downloads result #3 from your last search
 lamplight download 3 --force    # re-download even if it's already in history, or search results are stale
 ```
 
-lamplight blocks duplicate downloads — if that link is already in your history it'll tell you. use `--force` to download anyway.
+lamplight blocks duplicate downloads — if that link is already in your history it'll tell you. Use `--force` to download anyway.
 
 ### history
 ```bash
@@ -118,17 +118,17 @@ lamplight history list --filter failed
 lamplight history list "dune"                     # search by title (substring)
 lamplight history list "herbert" --filter completed
 
-lamplight history sync                            # poll deluge for status updates
+lamplight history sync                            # poll Deluge for status updates
 lamplight history sync -w                         # live progress view, refreshes every second
-lamplight history retry 3                         # re-send entry #3 to deluge
+lamplight history retry 3                         # re-send entry #3 to Deluge
 lamplight history retry --all-failed              # re-send everything that failed at once
-lamplight history cancel 3                        # remove from deluge and history
+lamplight history cancel 3                        # remove from Deluge and history
 lamplight history cancel 3 --delete-data          # same, but also deletes files from disk
 lamplight history update 3 --status failed        # manually fix a stuck entry
 lamplight history clear
 ```
 
-the index shown in `history list` is always the global index — use it directly with `retry`, `update`, or `cancel` even when filtering.
+The index shown in `history list` is always the global index — use it directly with `retry`, `update`, or `cancel` even when filtering.
 
 ### organize
 ```bash
@@ -137,25 +137,25 @@ lamplight organize ~/Downloads/some-book.epub     # one-off manual file or folde
 lamplight organize --dry-run                      # preview without moving anything
 ```
 
-run `history sync` first to make sure statuses are up to date, then `organize` to move everything into your library.
+Run `history sync` first to make sure statuses are up to date, then `organize` to move everything into your library.
 
-files with complete metadata (author + title) go into:
+Files with complete metadata (author + title) go into:
 ```
 <library-path>/<template>.<ext>
 ```
 
-everything else ends up in:
+Everything else ends up in:
 ```
 <library-path>/uncategorized/<filename>
 ```
 
-**multi-file downloads** (audiobook chapters, comic bundles) are kept together in a folder:
+**Multi-file downloads** (audiobook chapters, comic bundles) are kept together in a folder:
 ```
 <library-path>/<author>/<title>/01 - Chapter One.mp3
                                 02 - Chapter Two.mp3
 ```
 
-if you have both an ebook and an audiobook of the same title, they sit side by side under the same author folder without conflicting:
+If you have both an ebook and an audiobook of the same title, they sit side by side under the same author folder without conflicting:
 ```
 /mnt/media/books/
   Frank Herbert/
@@ -164,19 +164,19 @@ if you have both an ebook and an audiobook of the same title, they sit side by s
       Dune - Frank Herbert.mobi
 ```
 
-if you set `--audiobook-path`, audiobooks go to a completely separate root:
+If you set `--audiobook-path`, audiobooks go to a completely separate root:
 ```
 /mnt/media/books/Frank Herbert/Dune/Dune - Frank Herbert.epub
 /mnt/media/audiobooks/Frank Herbert/Dune/01.mp3
 ```
 
-if a filename already exists, lamplight appends `_2`, `_3`, etc rather than overwriting.
+If a filename already exists, lamplight appends `_2`, `_3`, etc. rather than overwriting.
 
-**metadata sources**, in order of preference:
+**Metadata sources**, in order of preference:
 - epub: Dublin Core fields from the OPF file inside the zip
 - mp3: ID3v2 tags (supports UTF-8, UTF-16 LE/BE)
 - m4b/m4a: iTunes MP4 atoms (`©nam`, `©ART`, `©day`)
-- fallback: `Author - Title` filename pattern
+- Fallback: `Author - Title` filename pattern
 
 ### config
 ```bash
@@ -184,16 +184,16 @@ lamplight config get
 lamplight config set --library-path /mnt/media/books
 lamplight config set --template "{author}/{title} ({year})"
 
-# keep audiobooks separate from books (optional)
+# Keep audiobooks separate from books (optional)
 lamplight config set --audiobook-path /mnt/media/audiobooks
 
-# if deluge runs in docker (see below)
+# If Deluge runs in Docker (see below)
 lamplight config set --deluge-path /data --host-path /opt/docker/data/delugevpn/downloads
 ```
 
-if `--audiobook-path` is set, mp3/m4b/m4a files get organized there instead of `--library-path`. if it's not set, everything goes to the same place like before.
+If `--audiobook-path` is set, mp3/m4b/m4a files get organized there instead of `--library-path`. If it's not set, everything goes to the same place.
 
-available template tokens: `{author}`, `{title}`, `{year}`, `{publisher}`, `{isbn}`, `{format}`
+Available template tokens: `{author}`, `{title}`, `{year}`, `{publisher}`, `{isbn}`, `{format}`
 
 ### indexer
 ```bash
@@ -222,33 +222,33 @@ lamplight client update 1 --priority 1
 
 ---
 
-## setup
+## Setup
 
 ```bash
-# 1. add your provider
+# 1. Add your provider
 lamplight provider add --name prowlarr --type prowlarr --host 192.168.0.17 --port 9696 --api-key your_key
 
-# 2. sync indexers (pulls only book-supporting ones)
+# 2. Sync indexers (pulls only book-supporting ones)
 lamplight provider sync
 
-# 3. add deluge
+# 3. Add Deluge
 lamplight client add --name deluge --type deluge --host 192.168.0.17 --port 8112 --password your_password
 
-# 4. set your library path
+# 4. Set your library path
 lamplight config set --library-path /mnt/media/books
 
-# 5. search and download
+# 5. Search and download
 lamplight search "consider phlebas" -t epub
 lamplight download 1
 
-# 6. once it's done, sync status then organize
+# 6. Once it's done, sync status then organize
 lamplight history sync
 lamplight organize
 ```
 
 ---
 
-## docker path mapping
+## Docker path mapping
 
 If Deluge runs in a Docker container, it reports file paths from inside the container — not the real path on your host. This will cause `lamplight organize` to fail because the file doesn't exist at that path.
 
@@ -274,7 +274,7 @@ The left side is your `--host-path`, the right side is your `--deluge-path`.
 
 ---
 
-## building
+## Building
 
 ```bash
 go build -o target/lamplight
@@ -284,36 +284,36 @@ go build -o target/lamplight
 
 ---
 
-## testing
+## Testing
 
 ```bash
-# run everything
+# Run everything
 go test ./...
 
-# run a specific package
+# Run a specific package
 go test ./internal/util/...
 go test ./internal/client/...
 go test ./cmd/...
 
-# with coverage
+# With coverage
 go test ./... -coverprofile=coverage.out
 go tool cover -func=coverage.out
 ```
 
-the test suite covers:
-- **path template** — `ApplyTemplate`, `sanitizePathComponent`, `IsComplete` — all edge cases including special chars, truncation, unknown fields
-- **metadata reading** — EPUB (Dublin Core OPF), MP3 ID3v2 (latin1, UTF-16 LE/BE, UTF-16BE without BOM), M4B iTunes atoms, filename fallback — all tested against programmatically built fixtures
-- **organize logic** — single file, multi-file folder (stays together), single file unwrapping, conflict resolution (`_2`, `_3`), dry-run, uncategorized fallback, orphaned dir cleanup
-- **history repository** — Save, FindAll ordering, ExistsByLink (exact match), FindActive (excludes empty hash), FindCompleted (requires file path), all update methods — all with in-memory SQLite
-- **library config repository** — default creation, upsert, field updates — in-memory SQLite
-- **deluge client** — Authenticate (success, bad password, server down), Add magnet, Add torrent file, GetTorrentStatus (single file, multi-file → folder path, no files fallback) — all against a local mock HTTP server
-- **resolver** — direct magnet, redirect-to-magnet, torrent file download, HTML rejection, empty body, non-torrent content, 404
-- **sync helpers** — `translatePath` (all prefix/no-match/empty cases), `delugeStateToStatus` (every Deluge state)
-- **display utils** — `SmartTruncate`, `BytesToMb`, `CleanString`
+The test suite covers:
+- **Path template** — `ApplyTemplate`, `sanitizePathComponent`, `IsComplete` — all edge cases including special chars, truncation, unknown fields
+- **Metadata reading** — EPUB (Dublin Core OPF), MP3 ID3v2 (latin1, UTF-16 LE/BE, UTF-16BE without BOM), M4B iTunes atoms, filename fallback — all tested against programmatically built fixtures
+- **Organize logic** — single file, multi-file folder (stays together), single file unwrapping, conflict resolution (`_2`, `_3`), dry-run, uncategorized fallback, orphaned dir cleanup
+- **History repository** — Save, FindAll ordering, ExistsByLink (exact match), FindActive (excludes empty hash), FindCompleted (requires file path), all update methods — all with in-memory SQLite
+- **Library config repository** — default creation, upsert, field updates — in-memory SQLite
+- **Deluge client** — Authenticate (success, bad password, server down), Add magnet, Add torrent file, GetTorrentStatus (single file, multi-file → folder path, no files fallback) — all against a local mock HTTP server
+- **Resolver** — direct magnet, redirect-to-magnet, torrent file download, HTML rejection, empty body, non-torrent content, 404
+- **Sync helpers** — `translatePath` (all prefix/no-match/empty cases), `delugeStateToStatus` (every Deluge state)
+- **Display utils** — `SmartTruncate`, `BytesToMb`, `CleanString`
 
 ---
 
-## how format detection works
+## How format detection works
 
 Results come with a `FORMAT` column. Detection runs in priority order:
 
@@ -325,6 +325,6 @@ TPB and general indexers usually show `unknown` since they don't tag format. Boo
 
 ---
 
-## contributing
+## Contributing
 
-fork → branch → PR against `main`. see [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Fork → branch → PR against `main`. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
