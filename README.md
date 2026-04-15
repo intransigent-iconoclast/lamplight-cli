@@ -58,13 +58,7 @@ mv lamplight /usr/local/bin/
 
 ### From source
 
-Requires Go 1.24+.
-
-```bash
-go install github.com/intransigent-iconoclast/lamplight-cli@latest
-```
-
-Or clone and build:
+Requires Go 1.24+ and a C compiler (lamplight uses CGO for SQLite — see [CONTRIBUTING.md](CONTRIBUTING.md) for platform-specific setup).
 
 ```bash
 git clone https://github.com/intransigent-iconoclast/lamplight-cli.git
@@ -218,7 +212,7 @@ lamplight provider delete prowlarr
 
 ### client (Deluge)
 ```bash
-lamplight client add --name deluge --host 192.168.0.17 --port 8112 --password xxx
+lamplight client add --name deluge --client-type deluge --host 192.168.0.17 --port 8112 --password xxx
 lamplight client list
 lamplight client delete deluge
 lamplight client update 1 --priority 1
@@ -236,7 +230,7 @@ lamplight provider add --name prowlarr --type prowlarr --host 192.168.0.17 --por
 lamplight provider sync
 
 # 3. Add Deluge
-lamplight client add --name deluge --type deluge --host 192.168.0.17 --port 8112 --password your_password
+lamplight client add --name deluge --client-type deluge --host 192.168.0.17 --port 8112 --password your_password
 
 # 4. Set your library path
 lamplight config set --library-path /mnt/media/books
