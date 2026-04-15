@@ -8,6 +8,7 @@ import (
 
 type DownloaderClient interface {
 	Add(ctx context.Context, torrent *ResolvedTorrent) (string, error) // returns torrent hash
+	Remove(ctx context.Context, hash string, deleteData bool) error
 	GetTorrentStatus(ctx context.Context, hash string) (*TorrentStatus, error)
 	Supports(kind entity.DownloaderType) bool
 	Authenticate(ctx context.Context) error

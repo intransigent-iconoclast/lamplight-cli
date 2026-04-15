@@ -127,6 +127,17 @@ func (r *HistoryRepository) UpdateStatusAndPath(ctx context.Context, id uint, st
 	return nil
 }
 
+func (r *HistoryRepository) Delete(ctx context.Context, id uint) error {
+	result := r.db.WithContext(ctx).Delete(&entity.DownloadHistory{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("no entry found with id %d", id)
+	}
+	return nil
+}
+
 func (r *HistoryRepository) DeleteAll(ctx context.Context) error {
 	return r.db.WithContext(ctx).Where("1 = 1").Delete(&entity.DownloadHistory{}).Error
 }
