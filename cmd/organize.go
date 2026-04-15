@@ -105,7 +105,7 @@ Everything else ends up in:
 				}
 
 				if placed == "library" {
-					fmt.Fprintf(out, "  ok    %s\n        → library/%s\n", utils.SmartTruncate(entry.Title, 50), dest)
+					fmt.Fprintf(out, "  ok    %s\n        → %s\n", utils.SmartTruncate(entry.Title, 50), dest)
 				} else {
 					fmt.Fprintf(out, "  ok    %s\n        → uncategorized/%s\n", utils.SmartTruncate(entry.Title, 50), filepath.Base(dest))
 				}
@@ -130,7 +130,7 @@ Everything else ends up in:
 		if organizeErr != nil {
 			fmt.Fprintf(out, "  skip  %s — %v\n", label, organizeErr)
 		} else if placed == "library" {
-			fmt.Fprintf(out, "  ok    %s\n        → library/%s\n", label, dest)
+			fmt.Fprintf(out, "  ok    %s\n        → %s\n", label, dest)
 		} else {
 			fmt.Fprintf(out, "  ok    %s\n        → uncategorized/%s\n", label, filepath.Base(dest))
 		}
@@ -176,7 +176,7 @@ func organizeFile(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (st
 
 	if utils.IsComplete(meta) {
 		relPath = utils.ApplyTemplate(tmpl, meta) + ext
-		destDir = filepath.Join(root, "library", filepath.Dir(relPath))
+		destDir = filepath.Join(root, filepath.Dir(relPath))
 		placed = "library"
 	} else {
 		destDir = filepath.Join(root, "uncategorized")
@@ -190,7 +190,7 @@ func organizeFile(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (st
 	// re-derive relPath from the actual destination after conflict resolution —
 	// if _2 was appended, the original relPath would be wrong in history and output
 	if placed == "library" {
-		relPath = strings.TrimPrefix(destFile, filepath.Join(root, "library")+string(filepath.Separator))
+		relPath = strings.TrimPrefix(destFile, root+string(filepath.Separator))
 	} else {
 		relPath = filepath.Base(destFile)
 	}
@@ -246,7 +246,7 @@ func organizeDir(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (str
 	var destDir, relPath, placed string
 	if utils.IsComplete(meta) {
 		relPath = utils.ApplyTemplate(tmpl, meta)
-		destDir = filepath.Join(root, "library", relPath)
+		destDir = filepath.Join(root, relPath)
 		placed = "library"
 	} else {
 		relPath = filepath.Base(src)

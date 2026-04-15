@@ -96,7 +96,7 @@ func TestOrganizeFile_CompleteMetadata_GoesToLibrary(t *testing.T) {
 	assert.Equal(t, "library", placed)
 	// relPath includes the extension
 	assert.Equal(t, "Frank Herbert/Dune (1965).epub", relPath)
-	_, statErr := os.Stat(filepath.Join(libraryRoot, "library", "Frank Herbert", "Dune (1965).epub"))
+	_, statErr := os.Stat(filepath.Join(libraryRoot, "Frank Herbert", "Dune (1965).epub"))
 	assert.NoError(t, statErr)
 }
 
@@ -110,7 +110,7 @@ func TestOrganizeFile_DryRun_DoesNotMoveFile(t *testing.T) {
 	_, statErr := os.Stat(src)
 	assert.NoError(t, statErr)
 	// nothing in library
-	_, statErr = os.Stat(filepath.Join(libraryRoot, "library"))
+	_, statErr = os.Stat(filepath.Join(libraryRoot, "Frank Herbert"))
 	assert.True(t, os.IsNotExist(statErr))
 }
 
@@ -130,7 +130,7 @@ func TestOrganizeFile_ConflictResolved(t *testing.T) {
 
 	// relPath must reflect the actual _2 file, not the original name
 	assert.Equal(t, "Frank Herbert/Dune (1965)_2.epub", relPath2)
-	_, statErr := os.Stat(filepath.Join(libraryRoot, "library", "Frank Herbert", "Dune (1965)_2.epub"))
+	_, statErr := os.Stat(filepath.Join(libraryRoot, "Frank Herbert", "Dune (1965)_2.epub"))
 	assert.NoError(t, statErr)
 }
 
@@ -147,7 +147,7 @@ func TestOrganizeDir_SingleFile_Unwrapped(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "library", placed)
 	// file exists flat, not in a subfolder
-	_, statErr := os.Stat(filepath.Join(libraryRoot, "library", "Frank Herbert", "Dune (1965).epub"))
+	_, statErr := os.Stat(filepath.Join(libraryRoot, "Frank Herbert", "Dune (1965).epub"))
 	assert.NoError(t, statErr)
 }
 
@@ -174,8 +174,8 @@ func TestOrganizeDir_MultipleAudioFiles_StaysTogether(t *testing.T) {
 	assert.Equal(t, "Frank Herbert/Dune (1965)", relPath)
 
 	// both files should be inside the destination folder
-	_, err1 := os.Stat(filepath.Join(libraryRoot, "library", "Frank Herbert", "Dune (1965)", "01.mp3"))
-	_, err2 := os.Stat(filepath.Join(libraryRoot, "library", "Frank Herbert", "Dune (1965)", "02.mp3"))
+	_, err1 := os.Stat(filepath.Join(libraryRoot, "Frank Herbert", "Dune (1965)", "01.mp3"))
+	_, err2 := os.Stat(filepath.Join(libraryRoot, "Frank Herbert", "Dune (1965)", "02.mp3"))
 	assert.NoError(t, err1)
 	assert.NoError(t, err2)
 }
@@ -243,7 +243,7 @@ func TestOrganizeDir_DryRun_DoesNotMove(t *testing.T) {
 	assert.NoError(t, err2)
 
 	// nothing in library
-	_, statErr := os.Stat(filepath.Join(libraryRoot, "library"))
+	_, statErr := os.Stat(filepath.Join(libraryRoot, "Frank Herbert"))
 	assert.True(t, os.IsNotExist(statErr))
 }
 
@@ -259,10 +259,10 @@ func TestOrganizeFile_AudiobookPath_RoutesMP3(t *testing.T) {
 	assert.Equal(t, "library", placed)
 	assert.Equal(t, "Frank Herbert/Dune (1965).mp3", relPath)
 	// should be in the audiobook root, not the library root
-	_, statErr := os.Stat(filepath.Join(audiobookRoot, "library", "Frank Herbert", "Dune (1965).mp3"))
+	_, statErr := os.Stat(filepath.Join(audiobookRoot, "Frank Herbert", "Dune (1965).mp3"))
 	assert.NoError(t, statErr)
 	// should NOT be in the library root
-	_, statErr = os.Stat(filepath.Join(libraryRoot, "library", "Frank Herbert", "Dune (1965).mp3"))
+	_, statErr = os.Stat(filepath.Join(libraryRoot, "Frank Herbert", "Dune (1965).mp3"))
 	assert.True(t, os.IsNotExist(statErr))
 }
 
@@ -275,7 +275,7 @@ func TestOrganizeFile_AudiobookPath_EPUBStaysInLibrary(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "library", placed)
 	// should be in library root, not audiobook root
-	_, statErr := os.Stat(filepath.Join(libraryRoot, "library", "Frank Herbert", "Dune (1965).epub"))
+	_, statErr := os.Stat(filepath.Join(libraryRoot, "Frank Herbert", "Dune (1965).epub"))
 	assert.NoError(t, statErr)
 }
 
@@ -291,8 +291,8 @@ func TestOrganizeDir_AudiobookPath_RoutesAudioDir(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "library", placed)
 	// should be in audiobook root
-	_, err1 := os.Stat(filepath.Join(audiobookRoot, "library", "Frank Herbert", "Dune (1965)", "01.mp3"))
-	_, err2 := os.Stat(filepath.Join(audiobookRoot, "library", "Frank Herbert", "Dune (1965)", "02.mp3"))
+	_, err1 := os.Stat(filepath.Join(audiobookRoot, "Frank Herbert", "Dune (1965)", "01.mp3"))
+	_, err2 := os.Stat(filepath.Join(audiobookRoot, "Frank Herbert", "Dune (1965)", "02.mp3"))
 	assert.NoError(t, err1)
 	assert.NoError(t, err2)
 }
@@ -305,7 +305,7 @@ func TestOrganizeFile_NoAudiobookPath_AudioGoesToLibrary(t *testing.T) {
 	_, placed, err := organizeFile(src, libraryRoot, "", "{author}/{title} ({year})", false)
 	require.NoError(t, err)
 	assert.Equal(t, "library", placed)
-	_, statErr := os.Stat(filepath.Join(libraryRoot, "library", "Frank Herbert", "Dune (1965).mp3"))
+	_, statErr := os.Stat(filepath.Join(libraryRoot, "Frank Herbert", "Dune (1965).mp3"))
 	assert.NoError(t, statErr)
 }
 
