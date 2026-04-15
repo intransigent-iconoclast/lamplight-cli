@@ -80,6 +80,42 @@ func (c *DelugeClient) addFile(ctx context.Context, torrentBytes []byte) (string
 	return c.sendRPC(ctx, body)
 }
 
+// Remove removes a torrent from Deluge. Pass deleteData=true to also delete the downloaded files.
+func (c *DelugeClient) Remove(ctx context.Context, hash string, deleteData bool) error {
+	if err := c.Authenticate(ctx); err != nil {
+		return fmt.Errorf("authenticate: %w", err)
+	}
+
+	body := map[string]any{
+		"method": "core.remove_torrent",
+		"params": []any{hash, deleteData},
+		"id":     4,
+	}
+
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		return fmt.Errorf("marshal rpc body: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, buildDelugeUrl(*c.clientDetails), bytes.NewBuffer(bodyBytes))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("request failed: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("deluge returned status %d", resp.StatusCode)
+	}
+
+	return nil
+}
+
 // GetTorrentStatus queries Deluge for the current state of a torrent by hash.
 func (c *DelugeClient) GetTorrentStatus(ctx context.Context, hash string) (*TorrentStatus, error) {
 	if err := c.Authenticate(ctx); err != nil {
