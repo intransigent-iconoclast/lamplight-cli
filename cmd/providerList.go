@@ -58,7 +58,7 @@ By default, API keys are NOT shown. To include them, use:
 
 		switch unsafe {
 		case false:
-			utils.PrintOutput(
+			_ = utils.PrintOutput(
 				out,
 				string(utils.PROVIDER_SAFE),
 				providers,
@@ -74,7 +74,7 @@ By default, API keys are NOT shown. To include them, use:
 				},
 			)
 		default:
-			utils.PrintOutput(
+			_ = utils.PrintOutput(
 				out,
 				string(utils.PROVIDER_UNSAFE),
 				providers,

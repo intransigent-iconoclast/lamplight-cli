@@ -53,7 +53,7 @@ func TestResolve_URLReturnsTorrentFile(t *testing.T) {
 	torrentBytes := []byte("d8:announce27:http://tracker.example.come")
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/x-bittorrent")
-		w.Write(torrentBytes)
+		_, _ = w.Write(torrentBytes)
 	}))
 	defer srv.Close()
 
@@ -66,7 +66,7 @@ func TestResolve_URLReturnsTorrentFile(t *testing.T) {
 func TestResolve_HTMLResponse_ReturnsError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "text/html")
-		w.Write([]byte("<!DOCTYPE html><html><body>login required</body></html>"))
+		_, _ = w.Write([]byte("<!DOCTYPE html><html><body>login required</body></html>"))
 	}))
 	defer srv.Close()
 
@@ -77,7 +77,7 @@ func TestResolve_HTMLResponse_ReturnsError(t *testing.T) {
 
 func TestResolve_HTMLLowercase_ReturnsError(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("<html><body>nope</body></html>"))
+		_, _ = w.Write([]byte("<html><body>nope</body></html>"))
 	}))
 	defer srv.Close()
 
@@ -100,7 +100,7 @@ func TestResolve_EmptyBody_ReturnsError(t *testing.T) {
 func TestResolve_NonTorrentBinary_ReturnsError(t *testing.T) {
 	// valid non-empty body that isn't a torrent (doesn't start with 'd')
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("this is not a torrent"))
+		_, _ = w.Write([]byte("this is not a torrent"))
 	}))
 	defer srv.Close()
 

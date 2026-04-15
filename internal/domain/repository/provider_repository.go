@@ -37,7 +37,7 @@ func (r *ProviderRepository) SaveProvider(ctx context.Context, provider *entity.
 
 	if err := r.db.WithContext(ctx).Create(provider).Error; err != nil {
 		if errors.Is(err, gorm.ErrDuplicatedKey) {
-			return fmt.Errorf("Provider already exists")
+			return fmt.Errorf("provider already exists")
 		}
 		return fmt.Errorf("create provider: %w", err)
 	}

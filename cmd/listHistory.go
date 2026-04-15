@@ -69,7 +69,7 @@ the index shown is always the global index — use it directly with retry or upd
 			indices[i] = r.globalIdx
 		}
 
-		utils.PrintOutputWithIndices(out, string(utils.HISTORY), entries, indices, func(e entity.DownloadHistory) []string {
+		_ = utils.PrintOutputWithIndices(out, string(utils.HISTORY), entries, indices, func(e entity.DownloadHistory) []string {
 			return []string{
 				utils.CleanString(e.Title),
 				e.IndexerName,

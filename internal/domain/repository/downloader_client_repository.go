@@ -71,7 +71,7 @@ func (r *DownloaderRepository) FindHighestPriorityDownloader(ctx context.Context
 	var client entity.Downloader
 	err := r.db.WithContext(ctx).Order("priority ASC").Limit(1).Take(&client).Error
 	if err != nil {
-		return nil, fmt.Errorf("Error retrieving highest priority download client: %w", err)
+		return nil, fmt.Errorf("error retrieving highest priority download client: %w", err)
 	}
 	return &client, nil
 }

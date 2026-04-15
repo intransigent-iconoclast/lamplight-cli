@@ -161,7 +161,7 @@ var searchCmd = &cobra.Command{
 			titleMax = 80
 		}
 
-		utils.PrintOutput(out, string(utils.SEARCH_RESULTS), res,
+		_ = utils.PrintOutput(out, string(utils.SEARCH_RESULTS), res,
 			func(d dao.SearchResult) []string {
 				size := "?"
 				if d.SizeBytes != nil {

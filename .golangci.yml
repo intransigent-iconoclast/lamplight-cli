@@ -1,0 +1,32 @@
+version: "2"
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - staticcheck
+    - govet
+    - ineffassign
+    - unused
+  settings:
+    errcheck:
+      # defer close calls and fmt writes are idiomatic to ignore
+      exclude-functions:
+        - (io.Closer).Close
+        - (io.ReadCloser).Close
+        - (*os.File).Close
+        - (*archive/zip.ReadCloser).Close
+        - fmt.Fprint
+        - fmt.Fprintln
+        - fmt.Fprintf
+        - (*encoding/json.Encoder).Encode
+        - (*github.com/spf13/cobra.Command).MarkFlagRequired
+
+issues:
+  exclude-rules:
+    # w.Write / helper calls in test files are fine to ignore
+    - path: ".*_test\\.go"
+      linters: [errcheck]
+    # display helpers return errors that callers intentionally ignore
+    - text: "utils\\.Print"
+      linters: [errcheck]

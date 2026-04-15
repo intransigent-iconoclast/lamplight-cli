@@ -25,7 +25,7 @@ func NewCacheRepository(db *gorm.DB) *CacheRepository {
 func (c *CacheRepository) AddResultsToCache(ctx context.Context, results *[]dao.SearchResult) error {
 	j, err := json.Marshal(results)
 	if err != nil {
-		return fmt.Errorf("Error Marshaling Results: %w", err)
+		return fmt.Errorf("error marshaling results: %w", err)
 	}
 
 	row := entity.SearchCache{

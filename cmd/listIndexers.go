@@ -50,7 +50,7 @@ var listIndexersCmd = &cobra.Command{
 
 		switch unsafe {
 		case false:
-			utils.PrintOutput(
+			_ = utils.PrintOutput(
 				out,
 				string(utils.INDEXER_SAFE),
 				indexers,
@@ -65,7 +65,7 @@ var listIndexersCmd = &cobra.Command{
 				},
 			)
 		default:
-			utils.PrintOutput(
+			_ = utils.PrintOutput(
 				out,
 				string(utils.INDEXER_UNSAFE),
 				indexers,

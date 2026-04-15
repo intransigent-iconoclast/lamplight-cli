@@ -48,7 +48,7 @@ var listClientCmd = &cobra.Command{
 
 		switch unsafe {
 		case false:
-			utils.PrintOutput(
+			_ = utils.PrintOutput(
 				out,
 				string(utils.DOWNLOADER_SAFE),
 				clients,
@@ -66,7 +66,7 @@ var listClientCmd = &cobra.Command{
 				},
 			)
 		case true:
-			utils.PrintOutput(
+			_ = utils.PrintOutput(
 				out,
 				string(utils.DOWNLOADER_UNSAFE),
 				clients,
