@@ -74,7 +74,7 @@ run `history sync` first to make sure statuses are up to date, then `organize` t
 
 files with complete metadata (author + title) go into:
 ```
-<library-path>/library/<author>/<title> (<year>).<ext>
+<library-path>/<template>.<ext>
 ```
 
 everything else ends up in:
@@ -84,24 +84,23 @@ everything else ends up in:
 
 **multi-file downloads** (audiobook chapters, comic bundles) are kept together in a folder:
 ```
-<library-path>/library/<author>/<title> (<year>)/01 - Chapter One.mp3
-                                                  02 - Chapter Two.mp3
+<library-path>/<author>/<title>/01 - Chapter One.mp3
+                                02 - Chapter Two.mp3
 ```
 
 if you have both an ebook and an audiobook of the same title, they sit side by side under the same author folder without conflicting:
 ```
-library/
+/mnt/media/books/
   Frank Herbert/
-    Dune (1965).epub
-    Dune (1965)/
-      01.mp3
-      02.mp3
+    Dune/
+      Dune - Frank Herbert.epub
+      Dune - Frank Herbert.mobi
 ```
 
 if you set `--audiobook-path`, audiobooks go to a completely separate root:
 ```
-/mnt/media/books/library/Frank Herbert/Dune (1965).epub
-/mnt/media/audiobooks/library/Frank Herbert/Dune (1965)/01.mp3
+/mnt/media/books/Frank Herbert/Dune/Dune - Frank Herbert.epub
+/mnt/media/audiobooks/Frank Herbert/Dune/01.mp3
 ```
 
 if a filename already exists, lamplight appends `_2`, `_3`, etc rather than overwriting.
