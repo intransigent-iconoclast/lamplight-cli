@@ -42,9 +42,10 @@ Download the latest binary for your platform from the [releases page](https://gi
 | Platform | Archive |
 |----------|---------|
 | Linux (amd64) | `lamplight_vX.X.X_linux_amd64.tar.gz` |
-| macOS (Apple Silicon) | `lamplight_vX.X.X_darwin_arm64.tar.gz` |
-| macOS (Intel) | `lamplight_vX.X.X_darwin_amd64.tar.gz` |
+| macOS | `lamplight_vX.X.X_darwin_arm64.tar.gz` |
 | Windows (amd64) | `lamplight_vX.X.X_windows_amd64.zip` |
+
+> **Intel Mac?** Rosetta 2 runs the ARM binary transparently — no extra steps needed.
 
 ```bash
 # Example: Linux
