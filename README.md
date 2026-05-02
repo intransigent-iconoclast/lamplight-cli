@@ -208,14 +208,14 @@ lamplight provider add --name prowlarr --type prowlarr --host 192.168.0.17 --por
 lamplight provider list
 lamplight provider sync          # only syncs book-supporting indexers
 lamplight provider sync --all    # syncs everything
-lamplight provider delete prowlarr
+lamplight provider delete 1
 ```
 
 ### client (Deluge)
 ```bash
 lamplight client add --name deluge --client-type deluge --host 192.168.0.17 --port 8112 --password xxx
 lamplight client list
-lamplight client delete deluge
+lamplight client delete 1
 lamplight client update 1 --priority 1
 ```
 

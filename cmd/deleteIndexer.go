@@ -54,18 +54,18 @@ var deleteIndexerCmd = &cobra.Command{
 			if err != nil {
 				return fmt.Errorf("get flag 'index': %w", err)
 			}
-			if idx < 0 {
-				return fmt.Errorf("index must be >= 0 (got %d)", idx)
+			if idx <= 0 {
+				return fmt.Errorf("index must be >= 1 (got %d)", idx)
 			}
 
 			indexers, err := repo.FindAllIndexers(ctx)
 			if err != nil {
 				return fmt.Errorf("load indexers: %w", err)
 			}
-			if idx >= len(indexers) {
+			if idx > len(indexers) {
 				return fmt.Errorf("index %d out of range (have %d indexers)", idx, len(indexers))
 			}
-			target = &indexers[idx]
+			target = &indexers[idx-1]
 
 		case useName:
 			name, err := cmd.Flags().GetString("name")
