@@ -99,6 +99,20 @@ Everything else ends up in:
 
 			for _, entry := range completed {
 				filePath := entry.FilePath
+
+				// normalize relative paths stored by older versions —
+				// try joining with library roots to find the actual file
+				if !filepath.IsAbs(filePath) {
+					if candidate := filepath.Join(libraryPath, filePath); fileExists(candidate) {
+						filePath = candidate
+					} else if audiobookPath != "" {
+						if candidate := filepath.Join(audiobookPath, filePath); fileExists(candidate) {
+							filePath = candidate
+						}
+					}
+				}
+
+				// apply docker path translation if needed
 				if _, err := os.Stat(filePath); os.IsNotExist(err) && cfg.DelugePath != "" {
 					filePath = translatePath(filePath, cfg.DelugePath, cfg.HostPath)
 				}
@@ -181,6 +195,7 @@ Everything else ends up in:
 				fmt.Fprintf(out, "  →  %s\n     → uncategorized/%s\n", label, filepath.Base(dest))
 			}
 		}
+		return nil
 
 		return nil
 	},
@@ -208,7 +223,7 @@ func pickRootForDir(files []string, libraryRoot, audiobookRoot string) string {
 }
 
 // organizeFile moves a single file to the right place in the library.
-// Returns (relative-dest-path, "library"|"uncategorized", error).
+// Returns (absolute-dest-path, "library"|"uncategorized", error).
 func organizeFile(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (string, string, error) {
 	meta, err := utils.ReadMetadata(src)
 	if err != nil {
@@ -234,16 +249,8 @@ func organizeFile(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (st
 	destFile := filepath.Join(destDir, filepath.Base(relPath))
 	destFile = resolveConflict(destFile)
 
-	// re-derive relPath from the actual destination after conflict resolution —
-	// if _2 was appended, the original relPath would be wrong in history and output
-	if placed == "library" {
-		relPath = strings.TrimPrefix(destFile, root+string(filepath.Separator))
-	} else {
-		relPath = filepath.Base(destFile)
-	}
-
 	if dryRun {
-		return relPath, placed, nil
+		return destFile, placed, nil
 	}
 
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
@@ -254,7 +261,7 @@ func organizeFile(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (st
 		return "", "", fmt.Errorf("move file: %w", err)
 	}
 
-	return relPath, placed, nil
+	return destFile, placed, nil
 }
 
 // organizeEntry dispatches to organizeDir or organizeFile depending on what src is.
@@ -304,7 +311,7 @@ func organizeDir(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (str
 	destDir = resolveConflictDir(destDir)
 
 	if dryRun {
-		return relPath, placed, nil
+		return destDir, placed, nil
 	}
 
 	if err := os.MkdirAll(destDir, 0o755); err != nil {
@@ -322,7 +329,7 @@ func organizeDir(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (str
 	// behind by torrent clients (os.Remove would silently fail on non-empty dirs)
 	_ = os.RemoveAll(src)
 
-	return relPath, placed, nil
+	return destDir, placed, nil
 }
 
 // bestMetadata picks the most useful metadata from a list of files.
@@ -424,6 +431,12 @@ func collectBookFiles(dir string) ([]string, error) {
 		return nil
 	})
 	return files, err
+}
+
+// fileExists returns true if the path exists on disk.
+func fileExists(path string) bool {
+	_, err := os.Stat(path)
+	return err == nil
 }
 
 // expandHome replaces a leading ~ with the actual home directory.
