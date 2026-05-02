@@ -36,9 +36,21 @@ lamplight config set --template "{author}/{title}/{title} - {author}"
 
 ## Install
 
-### From a release (recommended)
+### One-liner (Linux and macOS)
 
-Download the latest binary from the [releases page](https://github.com/intransigent-iconoclast/lamplight-cli/releases).
+```bash
+curl -fsSL https://raw.githubusercontent.com/intransigent-iconoclast/lamplight-cli/main/install.sh | sh
+```
+
+Installs the latest release to `~/.local/bin`. Set `LAMPLIGHT_INSTALL_DIR` to override:
+
+```bash
+LAMPLIGHT_INSTALL_DIR=/usr/local/bin curl -fsSL https://raw.githubusercontent.com/intransigent-iconoclast/lamplight-cli/main/install.sh | sh
+```
+
+### Manual install
+
+Download the binary for your platform from the [releases page](https://github.com/intransigent-iconoclast/lamplight-cli/releases).
 
 | Platform | Archive |
 |----------|---------|
@@ -49,13 +61,9 @@ Download the latest binary from the [releases page](https://github.com/intransig
 > **Intel Mac?** Rosetta 2 runs the ARM binary transparently — no extra steps needed.
 
 ```bash
-# Linux
+# Linux / macOS
 tar xzf lamplight_v*.tar.gz
-sudo mv lamplight /usr/local/bin/
-
-# macOS
-tar xzf lamplight_v*.tar.gz
-mv lamplight /usr/local/bin/
+mv lamplight ~/.local/bin/
 ```
 
 ### From source
