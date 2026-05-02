@@ -81,22 +81,39 @@ Everything else ends up in:
 			}
 
 			if len(completed) == 0 {
-				fmt.Fprintln(out, "no completed downloads to organize.")
-				fmt.Fprintln(out, "run 'lamplight history sync' to check if anything has finished.")
+				fmt.Fprintln(out, "Nothing to organize — run 'lamplight history sync' first if you're expecting something.")
 				return nil
 			}
 
+			if dryRun {
+				fmt.Fprintln(out, "Dry run — nothing will be moved.")
+			} else {
+				fmt.Fprintf(out, "Library → %s\n", libraryPath)
+				if audiobookPath != "" {
+					fmt.Fprintf(out, "Audiobooks → %s\n", audiobookPath)
+				}
+				fmt.Fprintln(out)
+			}
+
+			var moved, skipped, already int
+
 			for _, entry := range completed {
-				// if the stored path doesn't exist, try translating it —
-				// handles the case where path mapping was set up after the download completed
 				filePath := entry.FilePath
 				if _, err := os.Stat(filePath); os.IsNotExist(err) && cfg.DelugePath != "" {
 					filePath = translatePath(filePath, cfg.DelugePath, cfg.HostPath)
 				}
 
+				// already inside the library — nothing to do, don't clutter the output
+				if strings.HasPrefix(filePath, libraryPath) || (audiobookPath != "" && strings.HasPrefix(filePath, audiobookPath)) {
+					already++
+					continue
+				}
+
+				title := utils.SmartTruncate(entry.Title, 50)
 				dest, placed, organizeErr := organizeEntry(filePath, libraryPath, audiobookPath, cfg.Template, dryRun)
 				if organizeErr != nil {
-					fmt.Fprintf(out, "  skip  %s — %v\n", utils.SmartTruncate(entry.Title, 50), organizeErr)
+					fmt.Fprintf(out, "  ✗  %s\n     %v\n", title, organizeErr)
+					skipped++
 					continue
 				}
 
@@ -104,11 +121,34 @@ Everything else ends up in:
 					_ = histRepo.UpdateStatusAndPath(ctx, entry.ID, entity.StatusCompleted, dest)
 				}
 
-				if placed == "library" {
-					fmt.Fprintf(out, "  ok    %s\n        → %s\n", utils.SmartTruncate(entry.Title, 50), dest)
-				} else {
-					fmt.Fprintf(out, "  ok    %s\n        → uncategorized/%s\n", utils.SmartTruncate(entry.Title, 50), filepath.Base(dest))
+				root := libraryPath
+				if audiobookPath != "" && strings.HasPrefix(dest, audiobookPath) {
+					root = audiobookPath
 				}
+				rel := strings.TrimPrefix(dest, root+string(filepath.Separator))
+
+				if placed == "library" {
+					fmt.Fprintf(out, "  ✓  %s\n     → %s\n", title, rel)
+				} else {
+					fmt.Fprintf(out, "  →  %s\n     → uncategorized/%s\n", title, filepath.Base(dest))
+				}
+				moved++
+			}
+
+			fmt.Fprintln(out)
+			if moved == 0 && skipped == 0 {
+				fmt.Fprintf(out, "All %d downloads already organized.\n", already)
+			} else {
+				if moved > 0 {
+					fmt.Fprintf(out, "Moved %d", moved)
+				}
+				if skipped > 0 {
+					fmt.Fprintf(out, "  Skipped %d", skipped)
+				}
+				if already > 0 {
+					fmt.Fprintf(out, "  Already organized %d", already)
+				}
+				fmt.Fprintln(out)
 			}
 
 			return nil
@@ -128,11 +168,18 @@ Everything else ends up in:
 		label := filepath.Base(inputPath)
 		dest, placed, organizeErr := organizeEntry(inputPath, libraryPath, audiobookPath, cfg.Template, dryRun)
 		if organizeErr != nil {
-			fmt.Fprintf(out, "  skip  %s — %v\n", label, organizeErr)
-		} else if placed == "library" {
-			fmt.Fprintf(out, "  ok    %s\n        → %s\n", label, dest)
+			fmt.Fprintf(out, "  ✗  %s\n     %v\n", label, organizeErr)
 		} else {
-			fmt.Fprintf(out, "  ok    %s\n        → uncategorized/%s\n", label, filepath.Base(dest))
+			root := libraryPath
+			if audiobookPath != "" && strings.HasPrefix(dest, audiobookPath) {
+				root = audiobookPath
+			}
+			rel := strings.TrimPrefix(dest, root+string(filepath.Separator))
+			if placed == "library" {
+				fmt.Fprintf(out, "  ✓  %s\n     → %s\n", label, rel)
+			} else {
+				fmt.Fprintf(out, "  →  %s\n     → uncategorized/%s\n", label, filepath.Base(dest))
+			}
 		}
 
 		return nil
