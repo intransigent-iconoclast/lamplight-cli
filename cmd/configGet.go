@@ -35,6 +35,12 @@ var configGetCmd = &cobra.Command{
 			fmt.Fprintln(out, "audiobook-path   (not set — audiobooks go into library-path)")
 		}
 
+		if cfg.ComicsPath != "" {
+			fmt.Fprintf(out, "comics-path      %s\n", cfg.ComicsPath)
+		} else {
+			fmt.Fprintln(out, "comics-path      (not set — comics go into library-path)")
+		}
+
 		if cfg.DelugePath != "" || cfg.HostPath != "" {
 			fmt.Fprintf(out, "deluge-path      %s\n", cfg.DelugePath)
 			fmt.Fprintf(out, "host-path        %s\n", cfg.HostPath)

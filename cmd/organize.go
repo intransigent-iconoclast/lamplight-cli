@@ -34,6 +34,12 @@ var audioExtensions = map[string]bool{
 	".m4a": true,
 }
 
+// comicExtensions identifies comic/manga file types for path routing.
+var comicExtensions = map[string]bool{
+	".cbz": true,
+	".cbr": true,
+}
+
 var organizeCmd = &cobra.Command{
 	Use:   "organize [path]",
 	Short: "Move completed downloads into your library.",
@@ -71,6 +77,7 @@ Everything else ends up in:
 
 		libraryPath := expandHome(cfg.LibraryPath)
 		audiobookPath := expandHome(cfg.AudiobookPath)
+		comicsPath := expandHome(cfg.ComicsPath)
 
 		// --- no path: process completed history entries ---
 		if len(args) == 0 {
@@ -92,6 +99,9 @@ Everything else ends up in:
 				if audiobookPath != "" {
 					fmt.Fprintf(out, "Audiobooks → %s\n", audiobookPath)
 				}
+				if comicsPath != "" {
+					fmt.Fprintf(out, "Comics → %s\n", comicsPath)
+				}
 				fmt.Fprintln(out)
 			}
 
@@ -104,13 +114,15 @@ Everything else ends up in:
 				}
 
 				// already inside the library — nothing to do, don't clutter the output
-				if strings.HasPrefix(filePath, libraryPath) || (audiobookPath != "" && strings.HasPrefix(filePath, audiobookPath)) {
+				if strings.HasPrefix(filePath, libraryPath) ||
+					(audiobookPath != "" && strings.HasPrefix(filePath, audiobookPath)) ||
+					(comicsPath != "" && strings.HasPrefix(filePath, comicsPath)) {
 					already++
 					continue
 				}
 
 				title := utils.SmartTruncate(entry.Title, 50)
-				dest, placed, organizeErr := organizeEntry(filePath, libraryPath, audiobookPath, cfg.Template, dryRun)
+				dest, placed, organizeErr := organizeEntry(filePath, libraryPath, audiobookPath, comicsPath, cfg.Template, dryRun)
 				if organizeErr != nil {
 					fmt.Fprintf(out, "  ✗  %s\n     %v\n", title, organizeErr)
 					skipped++
@@ -124,6 +136,8 @@ Everything else ends up in:
 				root := libraryPath
 				if audiobookPath != "" && strings.HasPrefix(dest, audiobookPath) {
 					root = audiobookPath
+				} else if comicsPath != "" && strings.HasPrefix(dest, comicsPath) {
+					root = comicsPath
 				}
 				rel := strings.TrimPrefix(dest, root+string(filepath.Separator))
 
@@ -166,13 +180,15 @@ Everything else ends up in:
 		}
 
 		label := filepath.Base(inputPath)
-		dest, placed, organizeErr := organizeEntry(inputPath, libraryPath, audiobookPath, cfg.Template, dryRun)
+		dest, placed, organizeErr := organizeEntry(inputPath, libraryPath, audiobookPath, comicsPath, cfg.Template, dryRun)
 		if organizeErr != nil {
 			fmt.Fprintf(out, "  ✗  %s\n     %v\n", label, organizeErr)
 		} else {
 			root := libraryPath
 			if audiobookPath != "" && strings.HasPrefix(dest, audiobookPath) {
 				root = audiobookPath
+			} else if comicsPath != "" && strings.HasPrefix(dest, comicsPath) {
+				root = comicsPath
 			}
 			rel := strings.TrimPrefix(dest, root+string(filepath.Separator))
 			if placed == "library" {
@@ -186,37 +202,44 @@ Everything else ends up in:
 	},
 }
 
-// pickRoot returns the audiobook path for audio files when configured, otherwise the default library root.
-func pickRoot(src, libraryRoot, audiobookRoot string) string {
-	if audiobookRoot != "" && audioExtensions[strings.ToLower(filepath.Ext(src))] {
+// pickRoot returns the right destination root for a file based on its type.
+// Comics go to comicsRoot, audiobooks to audiobookRoot, everything else to libraryRoot.
+func pickRoot(src, libraryRoot, audiobookRoot, comicsRoot string) string {
+	ext := strings.ToLower(filepath.Ext(src))
+	if audiobookRoot != "" && audioExtensions[ext] {
 		return audiobookRoot
+	}
+	if comicsRoot != "" && comicExtensions[ext] {
+		return comicsRoot
 	}
 	return libraryRoot
 }
 
-// pickRootForDir returns the audiobook path when the directory contains audio files and it's configured.
-func pickRootForDir(files []string, libraryRoot, audiobookRoot string) string {
-	if audiobookRoot == "" {
-		return libraryRoot
-	}
+// pickRootForDir returns the right root for a directory of files.
+// Audio dirs go to audiobookRoot, comic dirs to comicsRoot, everything else to libraryRoot.
+func pickRootForDir(files []string, libraryRoot, audiobookRoot, comicsRoot string) string {
 	for _, f := range files {
-		if audioExtensions[strings.ToLower(filepath.Ext(f))] {
+		ext := strings.ToLower(filepath.Ext(f))
+		if audiobookRoot != "" && audioExtensions[ext] {
 			return audiobookRoot
+		}
+		if comicsRoot != "" && comicExtensions[ext] {
+			return comicsRoot
 		}
 	}
 	return libraryRoot
 }
 
 // organizeFile moves a single file to the right place in the library.
-// Returns (relative-dest-path, "library"|"uncategorized", error).
-func organizeFile(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (string, string, error) {
+// Returns (absolute-dest-path, "library"|"uncategorized", error).
+func organizeFile(src, libraryRoot, audiobookRoot, comicsRoot, tmpl string, dryRun bool) (string, string, error) {
 	meta, err := utils.ReadMetadata(src)
 	if err != nil {
 		_ = err // non-fatal — fall back to uncategorized
 	}
 
 	ext := strings.ToLower(filepath.Ext(src))
-	root := pickRoot(src, libraryRoot, audiobookRoot)
+	root := pickRoot(src, libraryRoot, audiobookRoot, comicsRoot)
 
 	var destDir, relPath string
 	var placed string
@@ -258,21 +281,21 @@ func organizeFile(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (st
 }
 
 // organizeEntry dispatches to organizeDir or organizeFile depending on what src is.
-func organizeEntry(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (string, string, error) {
+func organizeEntry(src, libraryRoot, audiobookRoot, comicsRoot, tmpl string, dryRun bool) (string, string, error) {
 	info, err := os.Stat(src)
 	if err != nil {
 		return "", "", fmt.Errorf("can't access '%s': %w", filepath.Base(src), err)
 	}
 	if info.IsDir() {
-		return organizeDir(src, libraryRoot, audiobookRoot, tmpl, dryRun)
+		return organizeDir(src, libraryRoot, audiobookRoot, comicsRoot, tmpl, dryRun)
 	}
-	return organizeFile(src, libraryRoot, audiobookRoot, tmpl, dryRun)
+	return organizeFile(src, libraryRoot, audiobookRoot, comicsRoot, tmpl, dryRun)
 }
 
 // organizeDir handles a folder of book files (e.g. an audiobook split into chapters,
 // or a comic series). Single-file folders are unwrapped and treated as a plain file.
 // Multi-file folders are moved as a group into library/{template}/ or uncategorized/{folder-name}/.
-func organizeDir(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (string, string, error) {
+func organizeDir(src, libraryRoot, audiobookRoot, comicsRoot, tmpl string, dryRun bool) (string, string, error) {
 	files, err := collectBookFiles(src)
 	if err != nil {
 		return "", "", fmt.Errorf("scan directory: %w", err)
@@ -283,12 +306,12 @@ func organizeDir(src, libraryRoot, audiobookRoot, tmpl string, dryRun bool) (str
 
 	// single file in a folder — unwrap it, no need for a subdirectory
 	if len(files) == 1 {
-		return organizeFile(files[0], libraryRoot, audiobookRoot, tmpl, dryRun)
+		return organizeFile(files[0], libraryRoot, audiobookRoot, comicsRoot, tmpl, dryRun)
 	}
 
 	// multiple files — pick the best metadata candidate to name the destination folder
 	meta := bestMetadata(files)
-	root := pickRootForDir(files, libraryRoot, audiobookRoot)
+	root := pickRootForDir(files, libraryRoot, audiobookRoot, comicsRoot)
 
 	var destDir, relPath, placed string
 	if utils.IsComplete(meta) {

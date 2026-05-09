@@ -105,8 +105,9 @@ lamplight client add --name deluge --client-type deluge --host 192.168.0.17 --po
 # 4. Set where your library lives
 lamplight config set --library-path /mnt/media/books
 
-# Optional: keep audiobooks in a separate folder
+# Optional: keep audiobooks and comics in separate folders
 lamplight config set --audiobook-path /mnt/media/audiobooks
+lamplight config set --comics-path /mnt/media/comics
 ```
 
 ---
@@ -225,6 +226,7 @@ lamplight config get
 lamplight config set --library-path /mnt/media/books
 lamplight config set --template "{author}/{title} ({year})"
 lamplight config set --audiobook-path /mnt/media/audiobooks
+lamplight config set --comics-path /mnt/media/comics
 
 # Docker path translation (see Docker path mapping below)
 lamplight config set --deluge-path /data --host-path /opt/docker/data/delugevpn/downloads
@@ -233,6 +235,7 @@ lamplight config set --deluge-path /data --host-path /opt/docker/data/delugevpn/
 Available template tokens: `{author}`, `{title}`, `{year}`, `{publisher}`, `{isbn}`, `{format}`
 
 If `--audiobook-path` is set, mp3/m4b/m4a files go there instead of `--library-path`.
+If `--comics-path` is set, cbz/cbr files go there instead of `--library-path`.
 
 ---
 
