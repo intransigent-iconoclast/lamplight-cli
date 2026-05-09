@@ -34,11 +34,12 @@ Available template tokens: {author} {title} {year} {publisher} {isbn} {format}`,
 		libraryPath, _ := cmd.Flags().GetString("library-path")
 		template, _ := cmd.Flags().GetString("template")
 		audiobookPath, _ := cmd.Flags().GetString("audiobook-path")
+		comicsPath, _ := cmd.Flags().GetString("comics-path")
 		delugePath, _ := cmd.Flags().GetString("deluge-path")
 		hostPath, _ := cmd.Flags().GetString("host-path")
 
-		if libraryPath == "" && template == "" && audiobookPath == "" && delugePath == "" && hostPath == "" {
-			return fmt.Errorf("nothing to set — use --library-path, --audiobook-path, --template, --deluge-path, or --host-path")
+		if libraryPath == "" && template == "" && audiobookPath == "" && comicsPath == "" && delugePath == "" && hostPath == "" {
+			return fmt.Errorf("nothing to set — use --library-path, --audiobook-path, --comics-path, --template, --deluge-path, or --host-path")
 		}
 
 		db, err := utils.Open("lamplight-cli", false)
@@ -61,6 +62,9 @@ Available template tokens: {author} {title} {year} {publisher} {isbn} {format}`,
 		if audiobookPath != "" {
 			cfg.AudiobookPath = audiobookPath
 		}
+		if comicsPath != "" {
+			cfg.ComicsPath = comicsPath
+		}
 		if delugePath != "" {
 			cfg.DelugePath = delugePath
 		}
@@ -78,6 +82,9 @@ Available template tokens: {author} {title} {year} {publisher} {isbn} {format}`,
 		if cfg.AudiobookPath != "" {
 			fmt.Fprintf(out, "audiobook-path   %s\n", cfg.AudiobookPath)
 		}
+		if cfg.ComicsPath != "" {
+			fmt.Fprintf(out, "comics-path      %s\n", cfg.ComicsPath)
+		}
 		if cfg.DelugePath != "" {
 			fmt.Fprintf(out, "deluge-path      %s\n", cfg.DelugePath)
 			fmt.Fprintf(out, "host-path        %s\n", cfg.HostPath)
@@ -92,6 +99,7 @@ func init() {
 	configSetCmd.Flags().String("library-path", "", "Root directory for your book library.")
 	configSetCmd.Flags().String("template", "", "Subfolder template. Tokens: {author} {title} {year} {publisher} {isbn} {format}")
 	configSetCmd.Flags().String("audiobook-path", "", "Separate root for audiobooks. If not set, audiobooks go into --library-path.")
+	configSetCmd.Flags().String("comics-path", "", "Separate root for comics and manga. If not set, comics go into --library-path.")
 	configSetCmd.Flags().String("deluge-path", "", "Path prefix Deluge reports (inside container), e.g. /data")
 	configSetCmd.Flags().String("host-path", "", "Actual host path that maps to --deluge-path, e.g. /opt/docker/data/delugevpn/downloads")
 }

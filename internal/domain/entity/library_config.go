@@ -6,6 +6,8 @@ type LibraryConfig struct {
 	Template    string `gorm:"size:1024;not null"`
 	// optional separate root for audiobooks. if empty, audiobooks go into LibraryPath.
 	AudiobookPath string `gorm:"size:1024"`
+	// optional separate root for comics/manga. if empty, comics go into LibraryPath.
+	ComicsPath string `gorm:"size:1024"`
 	// when deluge runs in docker it reports paths inside the container.
 	// set these two so lamplight can translate to the real host path.
 	DelugePath string `gorm:"size:1024"` // path prefix deluge reports, e.g. /data
