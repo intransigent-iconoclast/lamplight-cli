@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/repository"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/service"
 	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 	"github.com/spf13/cobra"
 )
@@ -51,7 +52,7 @@ by default the downloaded files are left on disk. use --delete-data to remove th
 
 		// if we have a hash, tell Deluge to remove it
 		if target.TorrentHash != "" {
-			downloaderClient, _, err := createClient(ctx, db, nil)
+			downloaderClient, _, err := service.ResolveDownloaderClient(ctx, repository.NewDownloaderRepository(db))
 			if err != nil {
 				return fmt.Errorf("connect to deluge: %w", err)
 			}

@@ -1,20 +1,18 @@
 package cmd
 
 import (
-	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/pkg/client"
 	"github.com/intransigent-iconoclast/lamplight-cli/pkg/dao"
-	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
 	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/repository"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/service"
 	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 	"github.com/spf13/cobra"
-	"gorm.io/gorm"
 )
 
 const (
@@ -88,69 +86,27 @@ use --force to download anyway if you know what you're doing.
 
 		selectedResult := results[selectedIndex]
 
-		httpClient := &http.Client{
-			Timeout: 20 * time.Second,
-		}
+		downloadSvc := service.NewDownloadService(
+			repository.NewHistoryRepository(db),
+			repository.NewDownloaderRepository(db),
+			&http.Client{Timeout: 20 * time.Second},
+		)
 
-		// block re-downloads unless --force is set
-		historyRepo := repository.NewHistoryRepository(db)
-		exists, err := historyRepo.ExistsByLink(ctx, selectedResult.Link)
-		if err == nil && exists && !force {
-			return fmt.Errorf("'%s' is already in your history — use --force to download it again", selectedResult.Title)
-		}
-
-		resolved, err := client.Resolve(ctx, httpClient, selectedResult.Link)
+		res, err := downloadSvc.Dispatch(ctx, selectedResult, force)
 		if err != nil {
-			return fmt.Errorf("resolve torrent: %w", err)
+			if errors.Is(err, service.ErrAlreadyInHistory) {
+				return fmt.Errorf("'%s' is already in your history — use --force to download it again", selectedResult.Title)
+			}
+			return err
 		}
 
-		downloaderClient, clientDetails, err := createClient(ctx, db, nil)
-		if err != nil {
-			return fmt.Errorf("error creating downloader client: %w", err)
+		if res.HistoryWarning != nil {
+			fmt.Fprintf(out, "warning: failed to record download history: %v\n", res.HistoryWarning)
 		}
 
-		hash, err := downloaderClient.Add(ctx, resolved)
-		if err != nil {
-			return fmt.Errorf("failed to add torrent: %w", err)
-		}
-
-		// Record to history — non-fatal if this fails
-		var sizeBytes int64
-		if selectedResult.SizeBytes != nil {
-			sizeBytes = *selectedResult.SizeBytes
-		}
-		entry := entity.DownloadHistory{
-			Title:          selectedResult.Title,
-			Link:           selectedResult.Link,
-			IndexerName:    selectedResult.IndexerName,
-			DownloaderName: clientDetails.Name,
-			SizeBytes:      sizeBytes,
-			Status:         entity.StatusSnatched,
-			TorrentHash:    hash,
-		}
-		if err := historyRepo.Save(ctx, &entry); err != nil {
-			fmt.Fprintf(out, "warning: failed to record download history: %v\n", err)
-		}
-
-		fmt.Fprintf(out, "Added: %s\n", selectedResult.Title)
+		fmt.Fprintf(out, "Added: %s\n", res.Title)
 		return nil
 	},
-}
-
-func createClient(ctx context.Context, db *gorm.DB, clientIndex *int) (client.DownloaderClient, *entity.Downloader, error) {
-	repo := repository.NewDownloaderRepository(db)
-
-	clientDetails, err := repo.FindHighestPriorityDownloader(ctx)
-	if err != nil {
-		return nil, nil, err
-	}
-
-	switch clientDetails.ClientType {
-	case entity.Deluge:
-		return client.NewDelugeClient(nil, clientDetails), clientDetails, nil
-	default:
-		return nil, nil, fmt.Errorf("unsupported downloader type: %s", clientDetails.ClientType)
-	}
 }
 
 func init() {

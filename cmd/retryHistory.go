@@ -9,6 +9,7 @@ import (
 	"github.com/intransigent-iconoclast/lamplight-cli/pkg/client"
 	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
 	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/repository"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/service"
 	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 	"github.com/spf13/cobra"
 )
@@ -50,7 +51,7 @@ or retry everything that's failed in one shot:
 				return nil
 			}
 
-			downloaderClient, _, err := createClient(ctx, db, nil)
+			downloaderClient, _, err := service.ResolveDownloaderClient(ctx, repository.NewDownloaderRepository(db))
 			if err != nil {
 				return fmt.Errorf("connect to downloader: %w", err)
 			}
@@ -103,7 +104,7 @@ or retry everything that's failed in one shot:
 			return fmt.Errorf("resolve torrent: %w", err)
 		}
 
-		downloaderClient, _, err := createClient(ctx, db, nil)
+		downloaderClient, _, err := service.ResolveDownloaderClient(ctx, repository.NewDownloaderRepository(db))
 		if err != nil {
 			return fmt.Errorf("create downloader client: %w", err)
 		}

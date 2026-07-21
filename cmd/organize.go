@@ -2,43 +2,12 @@ package cmd
 
 import (
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
-	"strings"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
 	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/repository"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/service"
 	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 	"github.com/spf13/cobra"
 )
-
-// bookExtensions are the file types we'll process.
-var bookExtensions = map[string]bool{
-	".epub": true,
-	".pdf":  true,
-	".mobi": true,
-	".azw":  true,
-	".azw3": true,
-	".mp3":  true,
-	".m4b":  true,
-	".m4a":  true,
-	".cbz":  true,
-	".cbr":  true,
-}
-
-// audioExtensions identifies audiobook file types for path routing.
-var audioExtensions = map[string]bool{
-	".mp3": true,
-	".m4b": true,
-	".m4a": true,
-}
-
-// comicExtensions identifies comic/manga file types for path routing.
-var comicExtensions = map[string]bool{
-	".cbz": true,
-	".cbr": true,
-}
 
 var organizeCmd = &cobra.Command{
 	Use:   "organize [path]",
@@ -75,390 +44,81 @@ Everything else ends up in:
 			return fmt.Errorf("load config: %w", err)
 		}
 
-		libraryPath := expandHome(cfg.LibraryPath)
-		audiobookPath := expandHome(cfg.AudiobookPath)
-		comicsPath := expandHome(cfg.ComicsPath)
+		organizeSvc := service.NewOrganizeService(repository.NewHistoryRepository(db))
 
-		// --- no path: process completed history entries ---
-		if len(args) == 0 {
-			histRepo := repository.NewHistoryRepository(db)
-			completed, err := histRepo.FindCompleted(ctx)
+		// --- path provided: one-off manual organize ---
+		if len(args) > 0 {
+			item, err := organizeSvc.OrganizePath(args[0], cfg, dryRun)
 			if err != nil {
-				return fmt.Errorf("load completed downloads: %w", err)
+				return err
 			}
-
-			if len(completed) == 0 {
-				fmt.Fprintln(out, "Nothing to organize — run 'lamplight history sync' first if you're expecting something.")
-				return nil
-			}
-
-			if dryRun {
-				fmt.Fprintln(out, "Dry run — nothing will be moved.")
-			} else {
-				fmt.Fprintf(out, "Library → %s\n", libraryPath)
-				if audiobookPath != "" {
-					fmt.Fprintf(out, "Audiobooks → %s\n", audiobookPath)
-				}
-				if comicsPath != "" {
-					fmt.Fprintf(out, "Comics → %s\n", comicsPath)
-				}
-				fmt.Fprintln(out)
-			}
-
-			var moved, skipped, already int
-
-			for _, entry := range completed {
-				filePath := entry.FilePath
-				if _, err := os.Stat(filePath); os.IsNotExist(err) && cfg.DelugePath != "" {
-					filePath = translatePath(filePath, cfg.DelugePath, cfg.HostPath)
-				}
-
-				// already inside the library — nothing to do, don't clutter the output
-				if strings.HasPrefix(filePath, libraryPath) ||
-					(audiobookPath != "" && strings.HasPrefix(filePath, audiobookPath)) ||
-					(comicsPath != "" && strings.HasPrefix(filePath, comicsPath)) {
-					already++
-					continue
-				}
-
-				title := utils.SmartTruncate(entry.Title, 50)
-				dest, placed, organizeErr := organizeEntry(filePath, libraryPath, audiobookPath, comicsPath, cfg.Template, dryRun)
-				if organizeErr != nil {
-					fmt.Fprintf(out, "  ✗  %s\n     %v\n", title, organizeErr)
-					skipped++
-					continue
-				}
-
-				if !dryRun {
-					_ = histRepo.UpdateStatusAndPath(ctx, entry.ID, entity.StatusCompleted, dest)
-				}
-
-				root := libraryPath
-				if audiobookPath != "" && strings.HasPrefix(dest, audiobookPath) {
-					root = audiobookPath
-				} else if comicsPath != "" && strings.HasPrefix(dest, comicsPath) {
-					root = comicsPath
-				}
-				rel := strings.TrimPrefix(dest, root+string(filepath.Separator))
-
-				if placed == "library" {
-					fmt.Fprintf(out, "  ✓  %s\n     → %s\n", title, rel)
-				} else {
-					fmt.Fprintf(out, "  →  %s\n     → uncategorized/%s\n", title, filepath.Base(dest))
-				}
-				moved++
-			}
-
-			fmt.Fprintln(out)
-			if moved == 0 && skipped == 0 {
-				fmt.Fprintf(out, "All %d downloads already organized.\n", already)
-			} else {
-				if moved > 0 {
-					fmt.Fprintf(out, "Moved %d", moved)
-				}
-				if skipped > 0 {
-					fmt.Fprintf(out, "  Skipped %d", skipped)
-				}
-				if already > 0 {
-					fmt.Fprintf(out, "  Already organized %d", already)
-				}
-				fmt.Fprintln(out)
-			}
-
+			printOrganizeItem(cmd, *item)
 			return nil
 		}
 
-		// --- path provided: one-off manual organize ---
-		inputPath := args[0]
-		info, err := os.Stat(inputPath)
+		// --- no path: process completed history entries ---
+		report, err := organizeSvc.OrganizeCompleted(ctx, cfg, dryRun)
 		if err != nil {
-			return fmt.Errorf("can't access '%s': %w", inputPath, err)
+			return err
 		}
 
-		if !info.IsDir() && !bookExtensions[strings.ToLower(filepath.Ext(inputPath))] {
-			return fmt.Errorf("'%s' doesn't look like a book file", filepath.Base(inputPath))
+		if report.Moved == 0 && report.Skipped == 0 && report.Already == 0 && len(report.Items) == 0 {
+			fmt.Fprintln(out, "Nothing to organize — run 'lamplight history sync' first if you're expecting something.")
+			return nil
 		}
 
-		label := filepath.Base(inputPath)
-		dest, placed, organizeErr := organizeEntry(inputPath, libraryPath, audiobookPath, comicsPath, cfg.Template, dryRun)
-		if organizeErr != nil {
-			fmt.Fprintf(out, "  ✗  %s\n     %v\n", label, organizeErr)
+		if dryRun {
+			fmt.Fprintln(out, "Dry run — nothing will be moved.")
 		} else {
-			root := libraryPath
-			if audiobookPath != "" && strings.HasPrefix(dest, audiobookPath) {
-				root = audiobookPath
-			} else if comicsPath != "" && strings.HasPrefix(dest, comicsPath) {
-				root = comicsPath
+			fmt.Fprintf(out, "Library → %s\n", report.LibraryPath)
+			if report.AudiobookPath != "" {
+				fmt.Fprintf(out, "Audiobooks → %s\n", report.AudiobookPath)
 			}
-			rel := strings.TrimPrefix(dest, root+string(filepath.Separator))
-			if placed == "library" {
-				fmt.Fprintf(out, "  ✓  %s\n     → %s\n", label, rel)
-			} else {
-				fmt.Fprintf(out, "  →  %s\n     → uncategorized/%s\n", label, filepath.Base(dest))
+			if report.ComicsPath != "" {
+				fmt.Fprintf(out, "Comics → %s\n", report.ComicsPath)
 			}
+			fmt.Fprintln(out)
+		}
+
+		for _, item := range report.Items {
+			if item.Already {
+				continue // already organized — don't clutter the output
+			}
+			printOrganizeItem(cmd, item)
+		}
+
+		fmt.Fprintln(out)
+		if report.Moved == 0 && report.Skipped == 0 {
+			fmt.Fprintf(out, "All %d downloads already organized.\n", report.Already)
+		} else {
+			if report.Moved > 0 {
+				fmt.Fprintf(out, "Moved %d", report.Moved)
+			}
+			if report.Skipped > 0 {
+				fmt.Fprintf(out, "  Skipped %d", report.Skipped)
+			}
+			if report.Already > 0 {
+				fmt.Fprintf(out, "  Already organized %d", report.Already)
+			}
+			fmt.Fprintln(out)
 		}
 
 		return nil
 	},
 }
 
-// pickRoot returns the right destination root for a file based on its type.
-// Comics go to comicsRoot, audiobooks to audiobookRoot, everything else to libraryRoot.
-func pickRoot(src, libraryRoot, audiobookRoot, comicsRoot string) string {
-	ext := strings.ToLower(filepath.Ext(src))
-	if audiobookRoot != "" && audioExtensions[ext] {
-		return audiobookRoot
+// printOrganizeItem renders a single organize outcome.
+func printOrganizeItem(cmd *cobra.Command, item service.OrganizeItem) {
+	out := cmd.OutOrStdout()
+	title := utils.SmartTruncate(item.Title, 50)
+	switch {
+	case item.Err != nil:
+		fmt.Fprintf(out, "  ✗  %s\n     %v\n", title, item.Err)
+	case item.Placed == "library":
+		fmt.Fprintf(out, "  ✓  %s\n     → %s\n", title, item.Dest)
+	default:
+		fmt.Fprintf(out, "  →  %s\n     → %s\n", title, item.Dest)
 	}
-	if comicsRoot != "" && comicExtensions[ext] {
-		return comicsRoot
-	}
-	return libraryRoot
-}
-
-// pickRootForDir returns the right root for a directory of files.
-// Audio dirs go to audiobookRoot, comic dirs to comicsRoot, everything else to libraryRoot.
-func pickRootForDir(files []string, libraryRoot, audiobookRoot, comicsRoot string) string {
-	for _, f := range files {
-		ext := strings.ToLower(filepath.Ext(f))
-		if audiobookRoot != "" && audioExtensions[ext] {
-			return audiobookRoot
-		}
-		if comicsRoot != "" && comicExtensions[ext] {
-			return comicsRoot
-		}
-	}
-	return libraryRoot
-}
-
-// organizeFile moves a single file to the right place in the library.
-// Returns (absolute-dest-path, "library"|"uncategorized", error).
-func organizeFile(src, libraryRoot, audiobookRoot, comicsRoot, tmpl string, dryRun bool) (string, string, error) {
-	meta, err := utils.ReadMetadata(src)
-	if err != nil {
-		_ = err // non-fatal — fall back to uncategorized
-	}
-
-	ext := strings.ToLower(filepath.Ext(src))
-	root := pickRoot(src, libraryRoot, audiobookRoot, comicsRoot)
-
-	var destDir, relPath string
-	var placed string
-
-	if utils.IsComplete(meta) {
-		relPath = utils.ApplyTemplate(tmpl, meta) + ext
-		destDir = filepath.Join(root, filepath.Dir(relPath))
-		placed = "library"
-	} else {
-		destDir = filepath.Join(root, "uncategorized")
-		relPath = filepath.Base(src)
-		placed = "uncategorized"
-	}
-
-	destFile := filepath.Join(destDir, filepath.Base(relPath))
-	destFile = resolveConflict(destFile)
-
-	// re-derive relPath from the actual destination after conflict resolution —
-	// if _2 was appended, the original relPath would be wrong in history and output
-	if placed == "library" {
-		relPath = strings.TrimPrefix(destFile, root+string(filepath.Separator))
-	} else {
-		relPath = filepath.Base(destFile)
-	}
-
-	if dryRun {
-		return relPath, placed, nil
-	}
-
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		return "", "", fmt.Errorf("create directory: %w", err)
-	}
-
-	if err := moveFile(src, destFile); err != nil {
-		return "", "", fmt.Errorf("move file: %w", err)
-	}
-
-	return relPath, placed, nil
-}
-
-// organizeEntry dispatches to organizeDir or organizeFile depending on what src is.
-func organizeEntry(src, libraryRoot, audiobookRoot, comicsRoot, tmpl string, dryRun bool) (string, string, error) {
-	info, err := os.Stat(src)
-	if err != nil {
-		return "", "", fmt.Errorf("can't access '%s': %w", filepath.Base(src), err)
-	}
-	if info.IsDir() {
-		return organizeDir(src, libraryRoot, audiobookRoot, comicsRoot, tmpl, dryRun)
-	}
-	return organizeFile(src, libraryRoot, audiobookRoot, comicsRoot, tmpl, dryRun)
-}
-
-// organizeDir handles a folder of book files (e.g. an audiobook split into chapters,
-// or a comic series). Single-file folders are unwrapped and treated as a plain file.
-// Multi-file folders are moved as a group into library/{template}/ or uncategorized/{folder-name}/.
-func organizeDir(src, libraryRoot, audiobookRoot, comicsRoot, tmpl string, dryRun bool) (string, string, error) {
-	files, err := collectBookFiles(src)
-	if err != nil {
-		return "", "", fmt.Errorf("scan directory: %w", err)
-	}
-	if len(files) == 0 {
-		return "", "", fmt.Errorf("no book files found inside")
-	}
-
-	// single file in a folder — unwrap it, no need for a subdirectory
-	if len(files) == 1 {
-		return organizeFile(files[0], libraryRoot, audiobookRoot, comicsRoot, tmpl, dryRun)
-	}
-
-	// multiple files — pick the best metadata candidate to name the destination folder
-	meta := bestMetadata(files)
-	root := pickRootForDir(files, libraryRoot, audiobookRoot, comicsRoot)
-
-	var destDir, relPath, placed string
-	if utils.IsComplete(meta) {
-		relPath = utils.ApplyTemplate(tmpl, meta)
-		destDir = filepath.Join(root, relPath)
-		placed = "library"
-	} else {
-		relPath = filepath.Base(src)
-		destDir = filepath.Join(root, "uncategorized", relPath)
-		placed = "uncategorized"
-	}
-
-	destDir = resolveConflictDir(destDir)
-
-	if dryRun {
-		return relPath, placed, nil
-	}
-
-	if err := os.MkdirAll(destDir, 0o755); err != nil {
-		return "", "", fmt.Errorf("create directory: %w", err)
-	}
-
-	for _, f := range files {
-		dst := filepath.Join(destDir, filepath.Base(f))
-		if err := moveFile(f, dst); err != nil {
-			return "", "", fmt.Errorf("move %s: %w", filepath.Base(f), err)
-		}
-	}
-
-	// clean up the source directory — RemoveAll handles nested subdirs left
-	// behind by torrent clients (os.Remove would silently fail on non-empty dirs)
-	_ = os.RemoveAll(src)
-
-	return relPath, placed, nil
-}
-
-// bestMetadata picks the most useful metadata from a list of files.
-// Prefers audio files for audiobooks (chapter files share the same album/book tags),
-// then returns the first candidate with complete metadata, falling back to whatever the first file has.
-func bestMetadata(files []string) *utils.BookMetadata {
-	audioExts := map[string]bool{".mp3": true, ".m4b": true, ".m4a": true}
-
-	candidates := files
-	var audioFiles []string
-	for _, f := range files {
-		if audioExts[strings.ToLower(filepath.Ext(f))] {
-			audioFiles = append(audioFiles, f)
-		}
-	}
-	if len(audioFiles) > 0 {
-		candidates = audioFiles
-	}
-
-	for _, f := range candidates {
-		meta, err := utils.ReadMetadata(f)
-		if err == nil && utils.IsComplete(meta) {
-			return meta
-		}
-	}
-
-	// nothing complete — return whatever the first file gives us
-	meta, _ := utils.ReadMetadata(candidates[0])
-	return meta
-}
-
-// resolveConflict appends _2, _3, … to the stem if the path already exists.
-func resolveConflict(path string) string {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return path
-	}
-	ext := filepath.Ext(path)
-	stem := strings.TrimSuffix(path, ext)
-	for i := 2; i < 100; i++ {
-		candidate := fmt.Sprintf("%s_%d%s", stem, i, ext)
-		if _, err := os.Stat(candidate); os.IsNotExist(err) {
-			return candidate
-		}
-	}
-	return path
-}
-
-// resolveConflictDir appends _2, _3, … to the directory name if it already exists.
-func resolveConflictDir(path string) string {
-	if _, err := os.Stat(path); os.IsNotExist(err) {
-		return path
-	}
-	for i := 2; i < 100; i++ {
-		candidate := fmt.Sprintf("%s_%d", path, i)
-		if _, err := os.Stat(candidate); os.IsNotExist(err) {
-			return candidate
-		}
-	}
-	return path
-}
-
-// moveFile tries os.Rename first (fast, same-device), falls back to copy+delete.
-func moveFile(src, dst string) error {
-	if err := os.Rename(src, dst); err == nil {
-		return nil
-	}
-	in, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer in.Close()
-
-	out, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	if _, err := io.Copy(out, in); err != nil {
-		_ = os.Remove(dst)
-		return err
-	}
-	if err := out.Close(); err != nil {
-		return err
-	}
-	return os.Remove(src)
-}
-
-// collectBookFiles walks a directory and returns all book file paths.
-func collectBookFiles(dir string) ([]string, error) {
-	var files []string
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return nil
-		}
-		if !info.IsDir() && bookExtensions[strings.ToLower(filepath.Ext(path))] {
-			files = append(files, path)
-		}
-		return nil
-	})
-	return files, err
-}
-
-// expandHome replaces a leading ~ with the actual home directory.
-func expandHome(path string) string {
-	if !strings.HasPrefix(path, "~") {
-		return path
-	}
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return path
-	}
-	return filepath.Join(home, path[1:])
 }
 
 func init() {
