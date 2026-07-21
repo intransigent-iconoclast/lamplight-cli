@@ -6,12 +6,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/client"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/constants"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/dao"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/service"
-	utils "github.com/intransigent-iconoclast/lamplight-cli/internal/util"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/client"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/constants"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/dao"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/repository"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/service"
+	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 	"github.com/spf13/cobra"
 )
 

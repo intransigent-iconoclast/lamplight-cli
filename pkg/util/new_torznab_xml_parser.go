@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/dao"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/dao"
 )
 
 type TorznabRSS struct {

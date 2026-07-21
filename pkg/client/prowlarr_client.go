@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/dao"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/dao"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
 )
 
 type ProwlarrClient struct {

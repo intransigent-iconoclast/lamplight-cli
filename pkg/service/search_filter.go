@@ -1,6 +1,6 @@
 package service
 
-import "github.com/intransigent-iconoclast/lamplight-cli/internal/dao"
+import "github.com/intransigent-iconoclast/lamplight-cli/pkg/dao"
 
 func FilterResults(hits []dao.SearchResult, criteria dao.FilterCriteria) []dao.SearchResult {
 	// no filter applied so keep it

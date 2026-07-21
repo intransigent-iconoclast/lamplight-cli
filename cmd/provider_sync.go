@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/client"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/constants"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/dao"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
-	utils "github.com/intransigent-iconoclast/lamplight-cli/internal/util"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/client"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/constants"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/dao"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/repository"
+	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 	"github.com/spf13/cobra"
 )
 

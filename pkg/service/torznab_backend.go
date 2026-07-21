@@ -3,10 +3,10 @@ package service
 import (
 	"context"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/client"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/dao"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
-	utils "github.com/intransigent-iconoclast/lamplight-cli/internal/util"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/client"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/dao"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
+	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 )
 
 type TorznabBackend struct {

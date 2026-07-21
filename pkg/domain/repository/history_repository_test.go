@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gorm.io/driver/sqlite"

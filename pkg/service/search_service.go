@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/dao"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/dao"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/repository"
 )
 
 // type definition

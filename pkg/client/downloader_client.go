@@ -3,7 +3,7 @@ package client
 import (
 	"context"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
 )
 
 type DownloaderClient interface {

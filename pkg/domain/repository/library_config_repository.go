@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 	"gorm.io/gorm/logger"

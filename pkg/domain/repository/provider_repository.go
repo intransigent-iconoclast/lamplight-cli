@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
 	"gorm.io/gorm"
 )
 

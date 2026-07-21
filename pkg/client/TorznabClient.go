@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
-	utils "github.com/intransigent-iconoclast/lamplight-cli/internal/util"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
+	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 )
 
 type TorznabClient struct {
