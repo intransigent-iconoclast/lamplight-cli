@@ -1,23 +1,16 @@
 package cmd
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/pkg/dao"
 	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/repository"
 	"github.com/intransigent-iconoclast/lamplight-cli/pkg/service"
 	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 	"github.com/spf13/cobra"
-)
-
-const (
-	cacheWarnAfter  = 10 * time.Minute
-	cacheStaleAfter = 30 * time.Minute
 )
 
 var downloadCmd = &cobra.Command{
@@ -51,40 +44,13 @@ use --force to download anyway if you know what you're doing.
 
 		cacheRepo := repository.NewCacheRepository(db)
 
-		cache, err := cacheRepo.GetCache(ctx)
+		selectedResult, age, err := service.ResolveCachedResult(ctx, cacheRepo, index, force)
 		if err != nil {
-			return fmt.Errorf("no cached results found — run 'lamplight search <query>' first")
+			return err
 		}
-
-		age := time.Since(cache.UpdatedAt)
-		if age > cacheStaleAfter && !force {
-			return fmt.Errorf(
-				"search results are %.0f minutes old — re-run your search or use --force to download anyway",
-				age.Minutes(),
-			)
-		}
-		if age > cacheWarnAfter {
+		if age > service.CacheWarnAfter {
 			fmt.Fprintf(out, "heads up: these results are %.0f minutes old\n", age.Minutes())
 		}
-
-		var results []dao.SearchResult
-		if err := json.Unmarshal([]byte(cache.Result), &results); err != nil {
-			return fmt.Errorf("error parsing cached results: %w", err)
-		}
-
-		if len(results) == 0 {
-			return fmt.Errorf("cached search results are empty")
-		}
-
-		selectedIndex := index - 1
-		if selectedIndex >= len(results) {
-			return fmt.Errorf(
-				"index %d out of range. Last search returned %d results",
-				index, len(results),
-			)
-		}
-
-		selectedResult := results[selectedIndex]
 
 		downloadSvc := service.NewDownloadService(
 			repository.NewHistoryRepository(db),
@@ -92,7 +58,7 @@ use --force to download anyway if you know what you're doing.
 			&http.Client{Timeout: 20 * time.Second},
 		)
 
-		res, err := downloadSvc.Dispatch(ctx, selectedResult, force)
+		res, err := downloadSvc.Dispatch(ctx, *selectedResult, force)
 		if err != nil {
 			if errors.Is(err, service.ErrAlreadyInHistory) {
 				return fmt.Errorf("'%s' is already in your history — use --force to download it again", selectedResult.Title)
