@@ -2,10 +2,13 @@ package cmd
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
+	"time"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
-	utils "github.com/intransigent-iconoclast/lamplight-cli/internal/util"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/repository"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/service"
+	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 	"github.com/spf13/cobra"
 )
 
@@ -36,44 +39,28 @@ by default the downloaded files are left on disk. use --delete-data to remove th
 			return fmt.Errorf("open db: %w", err)
 		}
 
-		histRepo := repository.NewHistoryRepository(db)
+		downloadSvc := service.NewDownloadService(
+			repository.NewHistoryRepository(db),
+			repository.NewDownloaderRepository(db),
+			&http.Client{Timeout: 20 * time.Second},
+		)
 
-		entries, err := histRepo.FindAll(ctx)
+		result, err := downloadSvc.CancelByIndex(ctx, index, deleteData)
 		if err != nil {
-			return fmt.Errorf("load history: %w", err)
-		}
-		if index > len(entries) {
-			return fmt.Errorf("index %d out of range (have %d entries)", index, len(entries))
+			return err
 		}
 
-		target := entries[index-1]
-		fmt.Fprintf(out, "cancelling: %s\n", target.Title)
-
-		// if we have a hash, tell Deluge to remove it
-		if target.TorrentHash != "" {
-			downloaderClient, _, err := createClient(ctx, db, nil)
-			if err != nil {
-				return fmt.Errorf("connect to deluge: %w", err)
-			}
-
-			if err := downloaderClient.Remove(ctx, target.TorrentHash, deleteData); err != nil {
-				// don't bail — if Deluge already finished or the torrent is gone, still clean up history
-				fmt.Fprintf(out, "  warn  couldn't remove from Deluge: %v\n", err)
-			} else {
-				if deleteData {
-					fmt.Fprintln(out, "  removed from Deluge (files deleted)")
-				} else {
-					fmt.Fprintln(out, "  removed from Deluge (files kept)")
-				}
-			}
-		} else {
+		fmt.Fprintf(out, "cancelling: %s\n", result.Title)
+		switch {
+		case !result.HadHash:
 			fmt.Fprintln(out, "  no torrent hash — skipping Deluge removal")
+		case result.Warning != "":
+			fmt.Fprintf(out, "  warn  %s\n", result.Warning)
+		case deleteData:
+			fmt.Fprintln(out, "  removed from Deluge (files deleted)")
+		default:
+			fmt.Fprintln(out, "  removed from Deluge (files kept)")
 		}
-
-		if err := histRepo.Delete(ctx, target.ID); err != nil {
-			return fmt.Errorf("remove from history: %w", err)
-		}
-
 		fmt.Fprintln(out, "  removed from history")
 		return nil
 	},

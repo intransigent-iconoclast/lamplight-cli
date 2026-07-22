@@ -10,10 +10,10 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/client"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
-	utils "github.com/intransigent-iconoclast/lamplight-cli/internal/util"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/client"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/repository"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/service"
+	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 	"github.com/spf13/cobra"
 )
 
@@ -40,6 +40,8 @@ press Ctrl+C to exit watch mode.`,
 		}
 
 		histRepo := repository.NewHistoryRepository(db)
+		downRepo := repository.NewDownloaderRepository(db)
+		syncSvc := service.NewSyncService(histRepo)
 
 		cfgRepo := repository.NewLibraryConfigRepository(db)
 		cfg, err := cfgRepo.Get(ctx)
@@ -47,7 +49,7 @@ press Ctrl+C to exit watch mode.`,
 			return fmt.Errorf("load config: %w", err)
 		}
 
-		downloaderClient, clientDetails, err := createClient(ctx, db, nil)
+		downloaderClient, clientDetails, err := service.ResolveDownloaderClient(ctx, downRepo)
 		if err != nil {
 			return fmt.Errorf("connect to downloader: %w", err)
 		}
@@ -57,7 +59,7 @@ press Ctrl+C to exit watch mode.`,
 		}
 
 		if !watch {
-			_, err := doSync(ctx, out, histRepo, downloaderClient, cfg.DelugePath, cfg.HostPath, false, 0)
+			_, err := renderSync(ctx, out, syncSvc, downloaderClient, cfg.DelugePath, cfg.HostPath, false, 0)
 			return err
 		}
 
@@ -70,7 +72,7 @@ press Ctrl+C to exit watch mode.`,
 		defer ticker.Stop()
 
 		// initial draw
-		prevLines, err = doSync(watchCtx, out, histRepo, downloaderClient, cfg.DelugePath, cfg.HostPath, true, prevLines)
+		prevLines, err = renderSync(watchCtx, out, syncSvc, downloaderClient, cfg.DelugePath, cfg.HostPath, true, prevLines)
 		if err != nil {
 			return err
 		}
@@ -81,7 +83,7 @@ press Ctrl+C to exit watch mode.`,
 				fmt.Fprintln(out, "\nstopped.")
 				return nil
 			case <-ticker.C:
-				prevLines, err = doSync(watchCtx, out, histRepo, downloaderClient, cfg.DelugePath, cfg.HostPath, true, prevLines)
+				prevLines, err = renderSync(watchCtx, out, syncSvc, downloaderClient, cfg.DelugePath, cfg.HostPath, true, prevLines)
 				if err != nil {
 					return err
 				}
@@ -90,21 +92,21 @@ press Ctrl+C to exit watch mode.`,
 	},
 }
 
-// doSync polls Deluge for all active entries and updates history.
-// In watch mode it redraws in place using ANSI cursor movement.
-// Returns the number of lines written (used by the next redraw to erase them).
-func doSync(
+// renderSync runs one sync pass via SyncService and renders it. In watch mode it
+// redraws in place using ANSI cursor movement. Returns the number of lines
+// written (used by the next redraw to erase them).
+func renderSync(
 	ctx context.Context,
 	out io.Writer,
-	histRepo *repository.HistoryRepository,
+	syncSvc *service.SyncService,
 	dc client.DownloaderClient,
 	delugePath, hostPath string,
 	watchMode bool,
 	prevLines int,
 ) (int, error) {
-	active, err := histRepo.FindActive(ctx)
+	result, err := syncSvc.SyncOnce(ctx, dc, delugePath, hostPath)
 	if err != nil {
-		return 0, fmt.Errorf("load active downloads: %w", err)
+		return 0, err
 	}
 
 	// in watch mode, move cursor back up to overwrite the previous frame
@@ -112,68 +114,48 @@ func doSync(
 		fmt.Fprintf(out, "\033[%dA\033[J", prevLines)
 	}
 
-	if len(active) == 0 {
-		msg := "nothing active to sync.\n"
-		fmt.Fprint(out, msg)
+	if len(result.Items) == 0 {
+		fmt.Fprint(out, "nothing active to sync.\n")
 		return 1, nil
 	}
 
 	lines := 0
-
 	if watchMode {
-		header := fmt.Sprintf("  watching %d download(s) — %s — Ctrl+C to stop\n\n",
-			len(active), time.Now().Format("15:04:05"))
-		fmt.Fprint(out, header)
+		fmt.Fprintf(out, "  watching %d download(s) — %s — Ctrl+C to stop\n\n",
+			len(result.Items), time.Now().Format("15:04:05"))
 		lines += 2
 	}
 
-	allDone := true
-	for _, entry := range active {
-		status, err := dc.GetTorrentStatus(ctx, entry.TorrentHash)
-		if err != nil {
-			line := fmt.Sprintf("  %-40s  error: %v\n", utils.SmartTruncate(entry.Title, 40), err)
-			fmt.Fprint(out, line)
-			lines++
-			allDone = false
-			continue
-		}
-
-		filePath := translatePath(status.FilePath, delugePath, hostPath)
-		newStatus, done := delugeStateToStatus(status.State)
-
-		if !done {
-			allDone = false
-		}
-
-		if err := histRepo.UpdateStatusAndPath(ctx, entry.ID, newStatus, filePath); err != nil {
-			line := fmt.Sprintf("  %-40s  couldn't update: %v\n", utils.SmartTruncate(entry.Title, 40), err)
-			fmt.Fprint(out, line)
+	for _, item := range result.Items {
+		title := utils.SmartTruncate(item.Entry.Title, 40)
+		if item.Err != nil {
+			if item.State == "" {
+				fmt.Fprintf(out, "  %-40s  error: %v\n", title, item.Err)
+			} else {
+				fmt.Fprintf(out, "  %-40s  couldn't update: %v\n", title, item.Err)
+			}
 			lines++
 			continue
 		}
 
 		if watchMode {
-			if done {
-				line := fmt.Sprintf("  ✓ %-38s  done\n", utils.SmartTruncate(entry.Title, 38))
-				fmt.Fprint(out, line)
+			if item.Done {
+				fmt.Fprintf(out, "  ✓ %-38s  done\n", utils.SmartTruncate(item.Entry.Title, 38))
 			} else {
-				bar := progressBar(status.Progress, 25)
-				line := fmt.Sprintf("  ~ %-38s  %s  %s\n",
-					utils.SmartTruncate(entry.Title, 38), bar, status.State)
-				fmt.Fprint(out, line)
+				bar := progressBar(item.Progress, 25)
+				fmt.Fprintf(out, "  ~ %-38s  %s  %s\n", utils.SmartTruncate(item.Entry.Title, 38), bar, item.State)
 			}
 		} else {
-			if done {
-				fmt.Fprintf(out, "  ✓ %-40s  completed\n", utils.SmartTruncate(entry.Title, 40))
+			if item.Done {
+				fmt.Fprintf(out, "  ✓ %-40s  completed\n", title)
 			} else {
-				fmt.Fprintf(out, "  ~ %-40s  %s (%.0f%%)\n",
-					utils.SmartTruncate(entry.Title, 40), status.State, status.Progress)
+				fmt.Fprintf(out, "  ~ %-40s  %s (%.0f%%)\n", title, item.State, item.Progress)
 			}
 		}
 		lines++
 	}
 
-	if watchMode && allDone && len(active) > 0 {
+	if watchMode && result.AllDone && len(result.Items) > 0 {
 		fmt.Fprintln(out, "\n  all done.")
 		lines += 2
 	}
@@ -181,31 +163,7 @@ func doSync(
 	return lines, nil
 }
 
-// delugeStateToStatus maps a Deluge state string to our status enum.
-// Returns (status, isComplete).
-func delugeStateToStatus(state string) (entity.DownloadStatus, bool) {
-	switch state {
-	case "Seeding": // 100% downloaded, now seeding
-		return entity.StatusCompleted, true
-	case "Error":
-		return entity.StatusFailed, false
-	case "Downloading", "Checking", "Moving":
-		return entity.StatusDownloading, false
-	default: // Queued, Paused, etc.
-		return entity.StatusSnatched, false
-	}
-}
-
-// translatePath replaces a container path prefix with the real host path.
-func translatePath(path, delugePath, hostPath string) string {
-	if delugePath == "" || hostPath == "" || !strings.HasPrefix(path, delugePath) {
-		return path
-	}
-	return hostPath + path[len(delugePath):]
-}
-
 // progressBar renders a fixed-width ASCII progress bar.
-// e.g. [████████████░░░░░░░░░░░░░] 60.0%
 func progressBar(progress float64, width int) string {
 	if progress < 0 {
 		progress = 0

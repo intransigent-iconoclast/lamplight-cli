@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/entity"
-	"github.com/intransigent-iconoclast/lamplight-cli/internal/domain/repository"
-	utils "github.com/intransigent-iconoclast/lamplight-cli/internal/util"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/repository"
+	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 	"github.com/spf13/cobra"
 )
 
