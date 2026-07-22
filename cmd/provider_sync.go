@@ -2,13 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/intransigent-iconoclast/lamplight-cli/pkg/client"
-	"github.com/intransigent-iconoclast/lamplight-cli/pkg/constants"
-	"github.com/intransigent-iconoclast/lamplight-cli/pkg/dao"
-	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/entity"
 	"github.com/intransigent-iconoclast/lamplight-cli/pkg/domain/repository"
+	"github.com/intransigent-iconoclast/lamplight-cli/pkg/service"
 	utils "github.com/intransigent-iconoclast/lamplight-cli/pkg/util"
 	"github.com/spf13/cobra"
 )
@@ -42,7 +38,6 @@ This command is idempotent:
 		if err != nil {
 			return fmt.Errorf("load providers: %w", err)
 		}
-
 		if len(providers) == 0 {
 			fmt.Fprintln(cmd.OutOrStdout(), "No providers configured.")
 			return nil
@@ -50,118 +45,15 @@ This command is idempotent:
 
 		syncAll, _ := cmd.Flags().GetBool("all")
 
-		added := 0
-		skipped := 0
-
-		for _, provider := range providers {
-			if !provider.Enabled {
-				continue
-			}
-
-			var providerClient client.ProviderClient
-
-			switch provider.Type {
-			case entity.ProviderTypeJackett:
-				providerClient = client.NewJackettClient()
-			case entity.ProviderTypeProwlarr:
-				providerClient = client.NewProwlarrClient()
-			default:
-				continue
-			}
-
-			indexers, err := providerClient.RetrieveIndexers(ctx, &provider)
-			if err != nil {
-				return fmt.Errorf(
-					"provider %q (%s): %w",
-					provider.Name,
-					provider.Type,
-					err,
-				)
-			}
-
-			for _, idx := range indexers {
-				// Skip indexers that don't support books, unless --all is set.
-				// If an indexer reports no caps at all, include it (fail open).
-				if !syncAll && len(idx.Caps) > 0 && !indexerSupportsBooks(idx) {
-					skipped++
-					continue
-				}
-
-				name := fmt.Sprintf(
-					"%s_%s",
-					sanitize(idx.Name),
-					sanitize(provider.Name),
-				)
-
-				var baseURL string
-				switch provider.Type {
-				case entity.ProviderTypeJackett:
-					baseURL = fmt.Sprintf(
-						"%s://%s:%d/api/v2.0/indexers/%s/results/torznab/",
-						provider.Scheme,
-						provider.Host,
-						provider.Port,
-						idx.ExternalID,
-					)
-				case entity.ProviderTypeProwlarr:
-					baseURL = fmt.Sprintf(
-						"%s://%s:%d/%s/api",
-						provider.Scheme,
-						provider.Host,
-						provider.Port,
-						idx.ExternalID,
-					)
-				}
-
-				newIndexer := entity.Indexer{
-					Name:        name,
-					BaseURL:     baseURL,
-					APIKey:      provider.APIKey,
-					IndexerType: entity.IndexerTypeTorznab,
-					Enabled:     true,
-				}
-
-				changed, err := indexerRepo.UpsertFromProvider(ctx, &newIndexer)
-				if err != nil {
-					return fmt.Errorf("save indexer %q: %w", name, err)
-				}
-
-				if changed {
-					added++
-				} else {
-					skipped++
-				}
-			}
+		syncSvc := service.NewProviderSyncService(providerRepo, indexerRepo)
+		report, err := syncSvc.Sync(ctx, syncAll)
+		if err != nil {
+			return err
 		}
 
-		fmt.Fprintf(
-			cmd.OutOrStdout(),
-			"Sync complete: %d added, %d skipped\n",
-			added,
-			skipped,
-		)
-
+		fmt.Fprintf(cmd.OutOrStdout(), "Sync complete: %d added, %d skipped\n", report.Added, report.Skipped)
 		return nil
 	},
-}
-
-func indexerSupportsBooks(idx dao.ProviderIndexerDAO) bool {
-	allowed := make(map[int]struct{}, len(constants.BookCategories))
-	for _, c := range constants.BookCategories {
-		allowed[c] = struct{}{}
-	}
-	for _, c := range idx.Caps {
-		if _, ok := allowed[c]; ok {
-			return true
-		}
-	}
-	return false
-}
-
-func sanitize(s string) string {
-	s = strings.ToLower(strings.TrimSpace(s))
-	s = strings.ReplaceAll(s, " ", "-")
-	return s
 }
 
 func init() {
