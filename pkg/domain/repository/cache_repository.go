@@ -52,3 +52,24 @@ func (c *CacheRepository) GetCache(ctx context.Context) (*entity.SearchCache, er
 	}
 	return &cache, nil
 }
+
+func (c *CacheRepository) AddLookupToCache(ctx context.Context, books *[]dao.Book) error {
+	j, err := json.Marshal(books)
+	if err != nil {
+		return fmt.Errorf("error marshaling lookup results: %w", err)
+	}
+
+	row := entity.LookupCache{
+		ID:     1,
+		Result: string(j),
+	}
+	return c.db.WithContext(ctx).Save(&row).Error
+}
+
+func (c *CacheRepository) GetLookupCache(ctx context.Context) (*entity.LookupCache, error) {
+	var cache entity.LookupCache
+	if err := c.db.First(&cache, 1).Error; err != nil {
+		return nil, err
+	}
+	return &cache, nil
+}
