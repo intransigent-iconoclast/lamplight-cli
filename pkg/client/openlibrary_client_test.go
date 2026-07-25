@@ -17,9 +17,9 @@ func mockOpenLibrary(t *testing.T) *httptest.Server {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/search/authors.json"):
-			w.Write([]byte(`{"docs":[{"key":"OL42A","name":"Becky Chambers","work_count":6}]}`))
+			_, _ = w.Write([]byte(`{"docs":[{"key":"OL42A","name":"Becky Chambers","work_count":6}]}`))
 		case strings.HasPrefix(r.URL.Path, "/authors/"):
-			w.Write([]byte(`{
+			_, _ = w.Write([]byte(`{
 				"bio":{"value":"American SF author. Known for Wayfarers."},
 				"birth_date":"3 May 1985",
 				"photos":[-1,987,988],
@@ -28,7 +28,7 @@ func mockOpenLibrary(t *testing.T) *httptest.Server {
 				"remote_ids":{"goodreads":"17650479","wikidata":"Q25298820"}
 			}`))
 		case strings.HasPrefix(r.URL.Path, "/search.json"):
-			w.Write([]byte(`{"docs":[
+			_, _ = w.Write([]byte(`{"docs":[
 				{"key":"/works/OL1W","title":"The Long Way to a Small, Angry Planet","first_publish_year":2014,"cover_i":111,"isbn":["9781473619814","1473619815"],"ratings_average":4.3,"author_name":["Becky Chambers"]},
 				{"key":"/works/OL2W","title":"A Closed and Common Orbit","first_publish_year":2016,"ratings_average":4.2,"author_name":["Becky Chambers"]},
 				{"key":"/works/OL1Wdup","title":"the long way to a small, angry planet","first_publish_year":2015,"author_name":["Becky Chambers"]}
@@ -80,7 +80,7 @@ func TestOpenLibraryLookup(t *testing.T) {
 
 func TestOpenLibraryLookupNoMatch(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(`{"docs":[]}`))
+		_, _ = w.Write([]byte(`{"docs":[]}`))
 	}))
 	defer srv.Close()
 
