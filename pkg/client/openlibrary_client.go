@@ -18,6 +18,10 @@ const (
 	OpenLibraryBaseURL = "https://openlibrary.org"
 	coversBooksBase    = "https://covers.openlibrary.org/b/id"
 	coversAuthorsBase  = "https://covers.openlibrary.org/a/id"
+	// coversAuthorsOLIDBase builds a photo URL directly from an author's
+	// OpenLibrary key (OLID), with no numeric photo id required — used by
+	// SearchAuthors, which doesn't fetch the detail record.
+	coversAuthorsOLIDBase = "https://covers.openlibrary.org/a/olid"
 )
 
 type OpenLibraryClient struct {
@@ -35,15 +39,18 @@ func NewOpenLibraryClient(client *http.Client) *OpenLibraryClient {
 	}
 }
 
+type olAuthorDoc struct {
+	Key       string `json:"key"`
+	Name      string `json:"name"`
+	WorkCount int    `json:"work_count"`
+}
+
 type olAuthorSearchResponse struct {
-	Docs []struct {
-		Key       string `json:"key"`
-		Name      string `json:"name"`
-		WorkCount int    `json:"work_count"`
-	} `json:"docs"`
+	Docs []olAuthorDoc `json:"docs"`
 }
 
 type olAuthorDetail struct {
+	Name           string          `json:"name"`
 	Bio            json.RawMessage `json:"bio"`
 	Photos         []int           `json:"photos"`
 	BirthDate      string          `json:"birth_date"`
@@ -88,39 +95,93 @@ func (c *OpenLibraryClient) Lookup(ctx context.Context, query string) (*dao.Auth
 	if author == nil {
 		return nil, fmt.Errorf("no author found matching %q", query)
 	}
-
-	// Enrichment (bio, photo, links, dates) is best-effort: a missing or partial
-	// detail record shouldn't sink an otherwise-good bibliography.
-	_ = c.enrichAuthor(ctx, author)
-
-	books, err := c.works(ctx, author.Key)
-	if err != nil {
+	if err := c.hydrate(ctx, author); err != nil {
 		return nil, err
 	}
-	author.Books = books
 	return author, nil
 }
 
-func (c *OpenLibraryClient) searchAuthor(ctx context.Context, query string) (*dao.Author, error) {
+// LookupByKey builds a full author record (enrichment + works) from a known
+// OpenLibrary author key, skipping the ambiguous name search entirely. Use this
+// when the caller already has a specific author's key (e.g. from SearchAuthors
+// or a stored reference) and wants that exact author, not a best-name-match.
+func (c *OpenLibraryClient) LookupByKey(ctx context.Context, key string) (*dao.Author, error) {
+	if strings.TrimSpace(key) == "" {
+		return nil, fmt.Errorf("author key is required")
+	}
+	author := &dao.Author{Key: key}
+	if err := c.hydrate(ctx, author); err != nil {
+		return nil, err
+	}
+	return author, nil
+}
+
+// hydrate enriches a (bio, photo, dates, links) and attaches its works. a.Key
+// must already be set. Enrichment is best-effort: a missing or partial detail
+// record shouldn't sink an otherwise-good bibliography.
+func (c *OpenLibraryClient) hydrate(ctx context.Context, a *dao.Author) error {
+	_ = c.enrichAuthor(ctx, a)
+
+	books, err := c.works(ctx, a.Key)
+	if err != nil {
+		return err
+	}
+	a.Books = books
+	return nil
+}
+
+// authorSearchDocs performs the /search/authors.json request and returns the
+// raw candidate docs in OpenLibrary's ranking order.
+func (c *OpenLibraryClient) authorSearchDocs(ctx context.Context, query string) ([]olAuthorDoc, error) {
 	u := fmt.Sprintf("%s/search/authors.json?q=%s", c.BaseURL, url.QueryEscape(query))
 
 	var resp olAuthorSearchResponse
 	if err := c.getJSON(ctx, u, &resp); err != nil {
 		return nil, fmt.Errorf("author search: %w", err)
 	}
-	if len(resp.Docs) == 0 {
+	return resp.Docs, nil
+}
+
+func (c *OpenLibraryClient) searchAuthor(ctx context.Context, query string) (*dao.Author, error) {
+	docs, err := c.authorSearchDocs(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	if len(docs) == 0 {
 		return nil, nil
 	}
 
 	// Results aren't popularity-ranked, so the first hit is often a near-namesake.
 	// The author with the most works is almost always the one meant.
-	best := resp.Docs[0]
-	for _, d := range resp.Docs[1:] {
+	best := docs[0]
+	for _, d := range docs[1:] {
 		if d.WorkCount > best.WorkCount {
 			best = d
 		}
 	}
 	return &dao.Author{Name: best.Name, Key: best.Key, WorkCount: best.WorkCount}, nil
+}
+
+// SearchAuthors returns every author candidate matching query, in
+// OpenLibrary's ranking order, without the per-author detail call that
+// enrichAuthor performs (no bio/links/dates — that would be one extra HTTP
+// round-trip per candidate). PhotoURL is built directly from the OpenLibrary
+// author key (OLID), so it costs nothing extra to include.
+func (c *OpenLibraryClient) SearchAuthors(ctx context.Context, query string) ([]dao.Author, error) {
+	docs, err := c.authorSearchDocs(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+
+	authors := make([]dao.Author, 0, len(docs))
+	for _, d := range docs {
+		a := dao.Author{Name: d.Name, Key: d.Key, WorkCount: d.WorkCount}
+		if d.Key != "" {
+			a.PhotoURL = fmt.Sprintf("%s/%s-M.jpg", coversAuthorsOLIDBase, d.Key)
+		}
+		authors = append(authors, a)
+	}
+	return authors, nil
 }
 
 // enrichAuthor fills in bio, portrait, dates, links, and remote ids from the
@@ -134,6 +195,12 @@ func (c *OpenLibraryClient) enrichAuthor(ctx context.Context, a *dao.Author) err
 		return err
 	}
 
+	// LookupByKey has no name (it skips the name search entirely); the detail
+	// record is authoritative, so fill it in when the caller didn't already
+	// have one from a search step.
+	if a.Name == "" && d.Name != "" {
+		a.Name = d.Name
+	}
 	a.Bio = bioText(d.Bio)
 	a.BirthDate = d.BirthDate
 	a.DeathDate = d.DeathDate
