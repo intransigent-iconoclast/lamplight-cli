@@ -16,7 +16,8 @@ import (
 
 const (
 	OpenLibraryBaseURL = "https://openlibrary.org"
-	coversBaseURL      = "https://covers.openlibrary.org/b/id"
+	coversBooksBase    = "https://covers.openlibrary.org/b/id"
+	coversAuthorsBase  = "https://covers.openlibrary.org/a/id"
 )
 
 type OpenLibraryClient struct {
@@ -43,19 +44,40 @@ type olAuthorSearchResponse struct {
 }
 
 type olAuthorDetail struct {
-	Bio json.RawMessage `json:"bio"`
+	Bio            json.RawMessage `json:"bio"`
+	Photos         []int           `json:"photos"`
+	BirthDate      string          `json:"birth_date"`
+	DeathDate      string          `json:"death_date"`
+	AlternateNames []string        `json:"alternate_names"`
+	Links          []struct {
+		Title string `json:"title"`
+		URL   string `json:"url"`
+	} `json:"links"`
+	RemoteIDs map[string]string `json:"remote_ids"`
 }
 
 type olWorksSearchResponse struct {
-	Docs []struct {
-		Key            string   `json:"key"`
-		Title          string   `json:"title"`
-		FirstPublished int      `json:"first_publish_year"`
-		CoverID        int      `json:"cover_i"`
-		ISBN           []string `json:"isbn"`
-		RatingsAverage float64  `json:"ratings_average"`
-		AuthorName     []string `json:"author_name"`
-	} `json:"docs"`
+	Docs []olWorkDoc `json:"docs"`
+}
+
+type olWorkDoc struct {
+	Key            string   `json:"key"`
+	Title          string   `json:"title"`
+	FirstPublished int      `json:"first_publish_year"`
+	CoverID        int      `json:"cover_i"`
+	ISBN           []string `json:"isbn"`
+	RatingsAverage float64  `json:"ratings_average"`
+	RatingsCount   int      `json:"ratings_count"`
+	EditionCount   int      `json:"edition_count"`
+	Pages          int      `json:"number_of_pages_median"`
+	AuthorName     []string `json:"author_name"`
+	AuthorKey      []string `json:"author_key"`
+	Language       []string `json:"language"`
+	Subject        []string `json:"subject"`
+	FirstSentence  []string `json:"first_sentence"`
+	EbookAccess    string   `json:"ebook_access"`
+	HasFulltext    bool     `json:"has_fulltext"`
+	IA             []string `json:"ia"`
 }
 
 func (c *OpenLibraryClient) Lookup(ctx context.Context, query string) (*dao.Author, error) {
@@ -67,9 +89,9 @@ func (c *OpenLibraryClient) Lookup(ctx context.Context, query string) (*dao.Auth
 		return nil, fmt.Errorf("no author found matching %q", query)
 	}
 
-	if bio, err := c.authorBio(ctx, author.Key); err == nil {
-		author.Bio = bio
-	}
+	// Enrichment (bio, photo, links, dates) is best-effort: a missing or partial
+	// detail record shouldn't sink an otherwise-good bibliography.
+	_ = c.enrichAuthor(ctx, author)
 
 	books, err := c.works(ctx, author.Key)
 	if err != nil {
@@ -98,38 +120,41 @@ func (c *OpenLibraryClient) searchAuthor(ctx context.Context, query string) (*da
 			best = d
 		}
 	}
-	return &dao.Author{Name: best.Name, Key: best.Key}, nil
+	return &dao.Author{Name: best.Name, Key: best.Key, WorkCount: best.WorkCount}, nil
 }
 
-func (c *OpenLibraryClient) authorBio(ctx context.Context, key string) (string, error) {
-	u := fmt.Sprintf("%s/authors/%s.json", c.BaseURL, url.PathEscape(key))
+// enrichAuthor fills in bio, portrait, dates, links, and remote ids from the
+// author's detail record. It mutates a in place; callers treat failures as
+// non-fatal.
+func (c *OpenLibraryClient) enrichAuthor(ctx context.Context, a *dao.Author) error {
+	u := fmt.Sprintf("%s/authors/%s.json", c.BaseURL, url.PathEscape(a.Key))
 
-	var detail olAuthorDetail
-	if err := c.getJSON(ctx, u, &detail); err != nil {
-		return "", err
-	}
-	if len(detail.Bio) == 0 {
-		return "", nil
+	var d olAuthorDetail
+	if err := c.getJSON(ctx, u, &d); err != nil {
+		return err
 	}
 
-	// bio is either a bare string or {"value": "..."}
-	var asString string
-	if err := json.Unmarshal(detail.Bio, &asString); err == nil {
-		return firstSentence(asString), nil
+	a.Bio = bioText(d.Bio)
+	a.BirthDate = d.BirthDate
+	a.DeathDate = d.DeathDate
+	a.AlternateNames = d.AlternateNames
+	a.RemoteIDs = d.RemoteIDs
+	for _, l := range d.Links {
+		a.Links = append(a.Links, dao.AuthorLink{Title: l.Title, URL: l.URL})
 	}
-	var asObject struct {
-		Value string `json:"value"`
+	if id := firstPositive(d.Photos); id > 0 {
+		a.PhotoID = id
+		a.PhotoURL = fmt.Sprintf("%s/%d-L.jpg", coversAuthorsBase, id)
 	}
-	if err := json.Unmarshal(detail.Bio, &asObject); err == nil {
-		return firstSentence(asObject.Value), nil
-	}
-	return "", nil
+	return nil
 }
 
 // workFields is the shared field set for the search.json endpoint: enough to
 // build a dao.Book (title/author/year/rating/cover/isbn) while keeping payloads
 // small.
-const workFields = "key,title,first_publish_year,cover_i,isbn,ratings_average,author_name"
+const workFields = "key,title,first_publish_year,cover_i,isbn,ratings_average,ratings_count," +
+	"edition_count,number_of_pages_median,author_name,author_key,language,subject," +
+	"first_sentence,ebook_access,has_fulltext,ia"
 
 // works lists a single author's catalog. Filtering on author_key (not a fuzzy
 // name match) keeps out namesakes' books while still returning ratings/covers/
@@ -181,17 +206,32 @@ func docsToBooks(resp olWorksSearchResponse) []dao.Book {
 		seen[norm] = true
 
 		b := dao.Book{
-			Title:   d.Title,
-			Authors: d.AuthorName,
-			Year:    d.FirstPublished,
-			Rating:  d.RatingsAverage,
-			WorkKey: d.Key,
+			Title:        d.Title,
+			Authors:      d.AuthorName,
+			AuthorKeys:   d.AuthorKey,
+			Year:         d.FirstPublished,
+			Rating:       d.RatingsAverage,
+			RatingsCount: d.RatingsCount,
+			EditionCount: d.EditionCount,
+			Pages:        d.Pages,
+			Languages:    d.Language,
+			Subjects:     capStrings(d.Subject, 12),
+			EbookAccess:  d.EbookAccess,
+			HasFulltext:  d.HasFulltext,
+			WorkKey:      d.Key,
 		}
 		if len(d.ISBN) > 0 {
 			b.ISBN = preferISBN13(d.ISBN)
 		}
+		if len(d.FirstSentence) > 0 {
+			b.FirstSentence = d.FirstSentence[0]
+		}
+		if len(d.IA) > 0 {
+			b.ArchiveID = d.IA[0]
+		}
 		if d.CoverID > 0 {
-			b.CoverURL = fmt.Sprintf("%s/%d-M.jpg", coversBaseURL, d.CoverID)
+			b.CoverID = d.CoverID
+			b.CoverURL = fmt.Sprintf("%s/%d-M.jpg", coversBooksBase, d.CoverID)
 		}
 		books = append(books, b)
 	}
@@ -235,10 +275,41 @@ func preferISBN13(isbns []string) string {
 	return isbns[0]
 }
 
-func firstSentence(s string) string {
-	s = strings.TrimSpace(s)
-	if i := strings.IndexByte(s, '.'); i > 0 {
-		return s[:i+1]
+// bioText normalizes OpenLibrary's bio field, which is either a bare string or
+// a {"value": "..."} object, into the full bio text.
+func bioText(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
 	}
-	return s
+	var asString string
+	if err := json.Unmarshal(raw, &asString); err == nil {
+		return strings.TrimSpace(asString)
+	}
+	var asObject struct {
+		Value string `json:"value"`
+	}
+	if err := json.Unmarshal(raw, &asObject); err == nil {
+		return strings.TrimSpace(asObject.Value)
+	}
+	return ""
+}
+
+// firstPositive returns the first positive id (OpenLibrary uses -1 as a
+// "no photo" sentinel), or 0 if none.
+func firstPositive(ids []int) int {
+	for _, id := range ids {
+		if id > 0 {
+			return id
+		}
+	}
+	return 0
+}
+
+// capStrings returns at most n elements, trimming noisy long lists (subjects can
+// run to hundreds).
+func capStrings(s []string, n int) []string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }
