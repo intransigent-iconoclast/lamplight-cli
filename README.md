@@ -5,6 +5,7 @@ A CLI for finding and downloading books. Talks to your self-hosted Prowlarr or J
 Built in Go. Open source. MIT licensed.
 
 - Search across multiple torrent indexers at once
+- Look up an author's bibliography and see what you're missing
 - Filter by format — epub, pdf, mobi, audiobook, comic
 - Download straight to Deluge with one command
 - Tracks history and syncs status from Deluge
@@ -152,6 +153,33 @@ lamplight search "stephen king" -t book,audiobook -l 100
 | `-i` | Search a specific indexer by index |
 
 Results are cached for 30 minutes. After that you'll need to re-run your search.
+
+### lookup
+
+Look up an author's bibliography and see, at a glance, which books you already
+have. Metadata comes from [OpenLibrary](https://openlibrary.org) — no API key,
+no setup.
+
+```bash
+lamplight lookup "becky chambers"
+lamplight lookup "becky chambers" --plain     # no color/borders — good for pipes
+lamplight lookup "becky chambers" --json      # machine-readable
+lamplight lookup --get 6                        # search & download book #6 from the last lookup
+```
+
+Each book is marked `✓` (in your download history) or `○` (missing), with the
+publish year and average rating. `--get N` takes a book from your last lookup,
+runs a search for it, and caches the results — so you can follow up with
+`lamplight download <index>` exactly like a normal search.
+
+| Flag | What it does |
+|------|-------------|
+| `--get` | Search & download book N from your last lookup |
+| `--plain` | Plain output — no color or borders |
+| `--json` | Output raw JSON |
+
+> Ownership is matched against your download history for now. Connecting a
+> library server (Komga/Kavita/Calibre) for a complete picture is on the roadmap.
 
 ### download
 
