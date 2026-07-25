@@ -10,16 +10,26 @@ import (
 )
 
 type stubProvider struct {
-	author *dao.Author
-	books  []dao.Book
+	author  *dao.Author
+	books   []dao.Book
+	authors []dao.Author
+	byKey   *dao.Author
 }
 
 func (s stubProvider) Lookup(_ context.Context, _ string) (*dao.Author, error) {
 	return s.author, nil
 }
 
+func (s stubProvider) LookupByKey(_ context.Context, _ string) (*dao.Author, error) {
+	return s.byKey, nil
+}
+
 func (s stubProvider) SearchBooks(_ context.Context, _ string) ([]dao.Book, error) {
 	return s.books, nil
+}
+
+func (s stubProvider) SearchAuthors(_ context.Context, _ string) ([]dao.Author, error) {
+	return s.authors, nil
 }
 
 func TestLookupGroupsSeriesAndMarksOwned(t *testing.T) {
@@ -85,4 +95,55 @@ func TestSearchBooksMarksOwnedAndKeepsOrder(t *testing.T) {
 	// only the history title is marked owned
 	assert.False(t, got[0].Owned)
 	assert.True(t, got[2].Owned, "title present in history should be owned")
+}
+
+func TestLookupByKeyGroupsSeriesAndMarksOwned(t *testing.T) {
+	author := &dao.Author{
+		Name: "Becky Chambers",
+		Key:  "OL42A",
+		Books: []dao.Book{
+			{Title: "Record of a Spaceborn Few", SeriesName: "Wayfarers", SeriesPos: 3, Year: 2018},
+			{Title: "The Long Way to a Small, Angry Planet", SeriesName: "Wayfarers", SeriesPos: 1, Year: 2014},
+			{Title: "To Be Taught, If Fortunate", Year: 2019}, // standalone
+		},
+	}
+
+	owned := NewHistoryOwnedIndex([]string{"Becky Chambers - The Long Way to a Small, Angry Planet (epub)"})
+	svc := NewLookupService(stubProvider{byKey: author}, owned)
+
+	res, err := svc.LookupByKey(context.Background(), "OL42A")
+	require.NoError(t, err)
+
+	require.Len(t, res.Series, 1)
+	assert.Equal(t, "Wayfarers", res.Series[0].Name)
+
+	// series-position order, not year-desc
+	wayfarers := res.Series[0].Books
+	assert.Equal(t, "The Long Way to a Small, Angry Planet", wayfarers[0].Title)
+	assert.Equal(t, "Record of a Spaceborn Few", wayfarers[1].Title)
+
+	require.Len(t, res.Standalone, 1)
+	assert.Equal(t, "To Be Taught, If Fortunate", res.Standalone[0].Title)
+
+	// ownership marked identically to name-based Lookup
+	assert.True(t, wayfarers[0].Owned, "title present in history should be owned")
+	assert.False(t, wayfarers[1].Owned)
+}
+
+func TestLookupByKeyNoMatch(t *testing.T) {
+	svc := NewLookupService(stubProvider{byKey: nil}, nil)
+	_, err := svc.LookupByKey(context.Background(), "OL999A")
+	require.Error(t, err)
+}
+
+func TestSearchAuthorsPassesThroughWithoutOwnership(t *testing.T) {
+	candidates := []dao.Author{
+		{Name: "Octavia E. Butler", Key: "OL42A", WorkCount: 31},
+		{Name: "Robert Olen Butler", Key: "OL99A", WorkCount: 24},
+	}
+	svc := NewLookupService(stubProvider{authors: candidates}, NewHistoryOwnedIndex(nil))
+
+	got, err := svc.SearchAuthors(context.Background(), "butler")
+	require.NoError(t, err)
+	assert.Equal(t, candidates, got)
 }

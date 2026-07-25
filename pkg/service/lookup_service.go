@@ -12,7 +12,9 @@ import (
 // reference https://openlibrary.org/swagger/docs
 type MetadataProvider interface {
 	Lookup(ctx context.Context, query string) (*dao.Author, error)
+	LookupByKey(ctx context.Context, key string) (*dao.Author, error)
 	SearchBooks(ctx context.Context, query string) ([]dao.Book, error)
+	SearchAuthors(ctx context.Context, query string) ([]dao.Author, error)
 }
 
 type OwnedIndex interface {
@@ -50,16 +52,34 @@ func (s *LookupService) Lookup(ctx context.Context, query string) (*LookupResult
 	if author == nil {
 		return nil, fmt.Errorf("no author found matching %q", query)
 	}
+	return s.buildResult(*author), nil
+}
 
+// LookupByKey resolves an author by a known OpenLibrary key (no ambiguous name
+// search) and returns the same series-grouped, ownership-marked shape as
+// Lookup. Use this when the caller already knows exactly which author it
+// wants (e.g. from SearchAuthors or a followed author's stored key).
+func (s *LookupService) LookupByKey(ctx context.Context, key string) (*LookupResult, error) {
+	author, err := s.provider.LookupByKey(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	if author == nil {
+		return nil, fmt.Errorf("no author found for key %q", key)
+	}
+	return s.buildResult(*author), nil
+}
+
+func (s *LookupService) buildResult(author dao.Author) *LookupResult {
 	for i := range author.Books {
 		if s.owned != nil {
 			author.Books[i].Owned = s.owned.Owns(author.Books[i].Title)
 		}
 	}
 
-	result := &LookupResult{Author: *author}
+	result := &LookupResult{Author: author}
 	groupBooks(result, author.Books)
-	return result, nil
+	return result
 }
 
 // SearchBooks runs a general catalog search (title/author/keyword) and marks
@@ -77,6 +97,12 @@ func (s *LookupService) SearchBooks(ctx context.Context, query string) ([]dao.Bo
 		}
 	}
 	return books, nil
+}
+
+// SearchAuthors returns author candidates for a query, unmodified — authors
+// aren't owned, so no ownership marking applies here.
+func (s *LookupService) SearchAuthors(ctx context.Context, query string) ([]dao.Author, error) {
+	return s.provider.SearchAuthors(ctx, query)
 }
 
 func groupBooks(result *LookupResult, books []dao.Book) {

@@ -11,15 +11,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func mockOpenLibrary(t *testing.T) *httptest.Server {
+// mockOpenLibrary returns a server plus a counter of requests made to
+// /search/authors.json, so tests can assert LookupByKey never issues a name
+// search.
+func mockOpenLibrary(t *testing.T) (*httptest.Server, *int) {
 	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	authorSearchHits := 0
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case strings.HasPrefix(r.URL.Path, "/search/authors.json"):
-			_, _ = w.Write([]byte(`{"docs":[{"key":"OL42A","name":"Becky Chambers","work_count":6}]}`))
+			authorSearchHits++
+			// three ranked candidates, in OpenLibrary's (non-work-count-sorted)
+			// order: Becky Chambers has the highest work_count so she remains
+			// the best-match pick for name-based Lookup.
+			_, _ = w.Write([]byte(`{"docs":[
+				{"key":"OL1A","name":"Becky Chambers Jr.","work_count":2},
+				{"key":"OL42A","name":"Becky Chambers","work_count":6},
+				{"key":"OL2A","name":"Rebecca Chambers","work_count":4}
+			]}`))
 		case strings.HasPrefix(r.URL.Path, "/authors/"):
 			_, _ = w.Write([]byte(`{
+				"name":"Becky Chambers",
 				"bio":{"value":"American SF author. Known for Wayfarers."},
 				"birth_date":"3 May 1985",
 				"photos":[-1,987,988],
@@ -37,10 +50,11 @@ func mockOpenLibrary(t *testing.T) *httptest.Server {
 			http.Error(w, "not found", http.StatusNotFound)
 		}
 	}))
+	return srv, &authorSearchHits
 }
 
 func TestOpenLibraryLookup(t *testing.T) {
-	srv := mockOpenLibrary(t)
+	srv, _ := mockOpenLibrary(t)
 	defer srv.Close()
 
 	c := NewOpenLibraryClient(srv.Client())
@@ -76,6 +90,65 @@ func TestOpenLibraryLookup(t *testing.T) {
 	assert.Equal(t, "9781473619814", tlw.ISBN, "ISBN-13 preferred")
 	assert.Equal(t, 111, tlw.CoverID)
 	assert.Contains(t, tlw.CoverURL, "/b/id/111-M.jpg")
+}
+
+func TestOpenLibrarySearchAuthors(t *testing.T) {
+	srv, hits := mockOpenLibrary(t)
+	defer srv.Close()
+
+	c := NewOpenLibraryClient(srv.Client())
+	c.BaseURL = srv.URL
+
+	authors, err := c.SearchAuthors(context.Background(), "chambers")
+	require.NoError(t, err)
+	require.Len(t, authors, 3)
+
+	// preserves OpenLibrary's ranking order — not re-sorted by work count
+	assert.Equal(t, "Becky Chambers Jr.", authors[0].Name)
+	assert.Equal(t, "Becky Chambers", authors[1].Name)
+	assert.Equal(t, "Rebecca Chambers", authors[2].Name)
+
+	assert.Equal(t, "OL42A", authors[1].Key)
+	assert.Equal(t, 6, authors[1].WorkCount)
+	assert.Contains(t, authors[1].PhotoURL, "/a/olid/OL42A-M.jpg")
+
+	// no enrichment — no per-author detail call
+	assert.Empty(t, authors[1].Bio)
+	assert.Empty(t, authors[1].Links)
+
+	assert.Equal(t, 1, *hits, "SearchAuthors should issue exactly one author search request")
+}
+
+func TestOpenLibraryLookupByKey(t *testing.T) {
+	srv, hits := mockOpenLibrary(t)
+	defer srv.Close()
+
+	c := NewOpenLibraryClient(srv.Client())
+	c.BaseURL = srv.URL
+
+	author, err := c.LookupByKey(context.Background(), "OL42A")
+	require.NoError(t, err)
+
+	// Name comes from the detail record — LookupByKey has no search step to get it from
+	assert.Equal(t, "Becky Chambers", author.Name)
+	// enriched, same as Lookup
+	assert.Equal(t, "American SF author. Known for Wayfarers.", author.Bio)
+	assert.Equal(t, "3 May 1985", author.BirthDate)
+	require.Len(t, author.Books, 2, "duplicate title should be collapsed")
+
+	// resolved directly by key — no author name search
+	assert.Equal(t, 0, *hits, "LookupByKey must not issue an author name search")
+}
+
+func TestOpenLibraryLookupByKeyEmpty(t *testing.T) {
+	srv, _ := mockOpenLibrary(t)
+	defer srv.Close()
+
+	c := NewOpenLibraryClient(srv.Client())
+	c.BaseURL = srv.URL
+
+	_, err := c.LookupByKey(context.Background(), "")
+	require.Error(t, err)
 }
 
 func TestOpenLibraryLookupNoMatch(t *testing.T) {
