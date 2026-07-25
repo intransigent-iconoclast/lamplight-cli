@@ -11,10 +11,15 @@ import (
 
 type stubProvider struct {
 	author *dao.Author
+	books  []dao.Book
 }
 
 func (s stubProvider) Lookup(_ context.Context, _ string) (*dao.Author, error) {
 	return s.author, nil
+}
+
+func (s stubProvider) SearchBooks(_ context.Context, _ string) ([]dao.Book, error) {
+	return s.books, nil
 }
 
 func TestLookupGroupsSeriesAndMarksOwned(t *testing.T) {
@@ -56,4 +61,28 @@ func TestLookupGroupsSeriesAndMarksOwned(t *testing.T) {
 	// ownership: only the one in history is marked, fuzzy across punctuation/format
 	assert.True(t, wayfarers[0].Owned, "title present in history should be owned")
 	assert.False(t, wayfarers[1].Owned)
+}
+
+func TestSearchBooksMarksOwnedAndKeepsOrder(t *testing.T) {
+	// relevance order from the provider, spanning multiple authors
+	books := []dao.Book{
+		{Title: "Why shoot a butler?", Authors: []string{"Georgette Heyer"}, Year: 1933},
+		{Title: "Parable of the Sower", Authors: []string{"Octavia E. Butler"}, Year: 1993},
+		{Title: "Kindred", Authors: []string{"Octavia E. Butler"}, Year: 1979},
+	}
+
+	owned := NewHistoryOwnedIndex([]string{"Octavia E. Butler - Kindred (epub)"})
+	svc := NewLookupService(stubProvider{books: books}, owned)
+
+	got, err := svc.SearchBooks(context.Background(), "butler")
+	require.NoError(t, err)
+
+	// order preserved (no series grouping / re-sort)
+	require.Len(t, got, 3)
+	assert.Equal(t, "Why shoot a butler?", got[0].Title)
+	assert.Equal(t, "Kindred", got[2].Title)
+
+	// only the history title is marked owned
+	assert.False(t, got[0].Owned)
+	assert.True(t, got[2].Owned, "title present in history should be owned")
 }

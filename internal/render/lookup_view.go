@@ -148,6 +148,84 @@ func renderPlain(w io.Writer, res *service.LookupResult, titleW int) {
 	fmt.Fprintf(w, "%s owned  %s missing\n", glyphOwned, glyphMissing)
 }
 
+// Books renders a flat, numbered book-search result list. Unlike Lookup (which
+// is one author's catalog), these span many authors, so the author name is
+// shown per row — a common-word query blends title- and author-matches, and the
+// author column is what makes that legible.
+func Books(w io.Writer, books []dao.Book, opts Options) {
+	width := opts.Width
+	if width <= 0 {
+		width = 100
+	}
+	titleW := (width - 24) / 2
+	if titleW < 18 {
+		titleW = 18
+	}
+	if titleW > 50 {
+		titleW = 50
+	}
+	authorW := titleW
+	if opts.Plain {
+		renderBooksPlain(w, books, titleW, authorW)
+		return
+	}
+	renderBooksRich(w, books, titleW, authorW)
+}
+
+func firstAuthor(b dao.Book) string {
+	if len(b.Authors) == 0 {
+		return ""
+	}
+	return b.Authors[0]
+}
+
+func renderBooksRich(w io.Writer, books []dao.Book, titleW, authorW int) {
+	r := lipgloss.NewRenderer(w)
+	idxStyle := r.NewStyle().Faint(true)
+	authorStyle := r.NewStyle().Foreground(lipgloss.Color("75"))
+	yearStyle := r.NewStyle().Faint(true)
+	ratingStyle := r.NewStyle().Foreground(lipgloss.Color("220"))
+	ownedGlyph := r.NewStyle().Foreground(lipgloss.Color("42")).Render(glyphOwned)
+	missingRow := r.NewStyle().Faint(true)
+
+	for i, b := range books {
+		idxCol := padLeft(strconv.Itoa(i+1), 3)
+		titleCol := padRight(utils.SmartTruncate(utils.CleanString(b.Title), titleW), titleW)
+		authorCol := padRight(utils.SmartTruncate(firstAuthor(b), authorW), authorW)
+		yearCol := yearStr(b.Year)
+		rateCol := ratingStr(b.Rating)
+
+		if b.Owned {
+			fmt.Fprintf(w, "  %s %s  %s  %s  %s  %s\n",
+				ownedGlyph, idxStyle.Render(idxCol), titleCol,
+				authorStyle.Render(authorCol), yearStyle.Render(yearCol), ratingStyle.Render(rateCol))
+			continue
+		}
+		plain := fmt.Sprintf("%s %s  %s  %s  %s  %s", glyphMissing, idxCol, titleCol, authorCol, yearCol, rateCol)
+		fmt.Fprintf(w, "  %s\n", missingRow.Render(plain))
+	}
+	fmt.Fprintln(w)
+
+	legend := fmt.Sprintf(" %s owned   %s missing", ownedGlyph, glyphMissing)
+	hint := r.NewStyle().Faint(true).Render("lamplight lookup --get <n>  →  search & download")
+	fmt.Fprintf(w, "%s    %s\n", legend, hint)
+}
+
+func renderBooksPlain(w io.Writer, books []dao.Book, titleW, authorW int) {
+	for i, b := range books {
+		glyph := glyphMissing
+		if b.Owned {
+			glyph = glyphOwned
+		}
+		titleCol := padRight(utils.SmartTruncate(utils.CleanString(b.Title), titleW), titleW)
+		authorCol := padRight(utils.SmartTruncate(firstAuthor(b), authorW), authorW)
+		fmt.Fprintf(w, "  %s %s  %s  %s  %s  %s\n",
+			glyph, padLeft(strconv.Itoa(i+1), 3), titleCol, authorCol, yearStr(b.Year), ratingStr(b.Rating))
+	}
+	fmt.Fprintln(w)
+	fmt.Fprintf(w, "%s owned  %s missing\n", glyphOwned, glyphMissing)
+}
+
 func yearStr(year int) string {
 	if year <= 0 {
 		return "    "

@@ -12,6 +12,7 @@ import (
 // reference https://openlibrary.org/swagger/docs
 type MetadataProvider interface {
 	Lookup(ctx context.Context, query string) (*dao.Author, error)
+	SearchBooks(ctx context.Context, query string) ([]dao.Book, error)
 }
 
 type OwnedIndex interface {
@@ -59,6 +60,23 @@ func (s *LookupService) Lookup(ctx context.Context, query string) (*LookupResult
 	result := &LookupResult{Author: *author}
 	groupBooks(result, author.Books)
 	return result, nil
+}
+
+// SearchBooks runs a general catalog search (title/author/keyword) and marks
+// each result owned against download history. Results stay in the provider's
+// relevance order and are flat — no series grouping, since a query can span
+// many authors and works.
+func (s *LookupService) SearchBooks(ctx context.Context, query string) ([]dao.Book, error) {
+	books, err := s.provider.SearchBooks(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	for i := range books {
+		if s.owned != nil {
+			books[i].Owned = s.owned.Owns(books[i].Title)
+		}
+	}
+	return books, nil
 }
 
 func groupBooks(result *LookupResult, books []dao.Book) {

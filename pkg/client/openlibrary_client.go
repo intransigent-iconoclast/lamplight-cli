@@ -126,18 +126,48 @@ func (c *OpenLibraryClient) authorBio(ctx context.Context, key string) (string, 
 	return "", nil
 }
 
-// Filtering on author_key (not a fuzzy name match) keeps out namesakes' books
-// while still returning ratings/covers/year, which the works.json endpoint omits.
+// workFields is the shared field set for the search.json endpoint: enough to
+// build a dao.Book (title/author/year/rating/cover/isbn) while keeping payloads
+// small.
+const workFields = "key,title,first_publish_year,cover_i,isbn,ratings_average,author_name"
+
+// works lists a single author's catalog. Filtering on author_key (not a fuzzy
+// name match) keeps out namesakes' books while still returning ratings/covers/
+// year, which the works.json endpoint omits. Ordered newest-first.
 func (c *OpenLibraryClient) works(ctx context.Context, authorKey string) ([]dao.Book, error) {
-	fields := "key,title,first_publish_year,cover_i,isbn,ratings_average,author_name"
 	u := fmt.Sprintf("%s/search.json?author_key=%s&fields=%s&limit=100",
-		c.BaseURL, url.QueryEscape(authorKey), url.QueryEscape(fields))
+		c.BaseURL, url.QueryEscape(authorKey), url.QueryEscape(workFields))
 
 	var resp olWorksSearchResponse
 	if err := c.getJSON(ctx, u, &resp); err != nil {
 		return nil, fmt.Errorf("works search: %w", err)
 	}
 
+	books := docsToBooks(resp)
+	sort.SliceStable(books, func(i, j int) bool {
+		return books[i].Year > books[j].Year
+	})
+	return books, nil
+}
+
+// SearchBooks does a general catalog search (title, author, or keyword) against
+// the same search.json endpoint. Unlike works, results span many authors and
+// stay in OpenLibrary's relevance order — so callers should surface author_name
+// per row, since a common-word query can blend title- and author-matches.
+func (c *OpenLibraryClient) SearchBooks(ctx context.Context, query string) ([]dao.Book, error) {
+	u := fmt.Sprintf("%s/search.json?q=%s&fields=%s&limit=25",
+		c.BaseURL, url.QueryEscape(query), url.QueryEscape(workFields))
+
+	var resp olWorksSearchResponse
+	if err := c.getJSON(ctx, u, &resp); err != nil {
+		return nil, fmt.Errorf("book search: %w", err)
+	}
+	return docsToBooks(resp), nil
+}
+
+// docsToBooks maps a search.json response to books, dropping untitled docs and
+// de-duplicating by normalized title while preserving input order.
+func docsToBooks(resp olWorksSearchResponse) []dao.Book {
 	books := make([]dao.Book, 0, len(resp.Docs))
 	seen := make(map[string]bool)
 	for _, d := range resp.Docs {
@@ -165,11 +195,7 @@ func (c *OpenLibraryClient) works(ctx context.Context, authorKey string) ([]dao.
 		}
 		books = append(books, b)
 	}
-
-	sort.SliceStable(books, func(i, j int) bool {
-		return books[i].Year > books[j].Year
-	})
-	return books, nil
+	return books
 }
 
 func (c *OpenLibraryClient) getJSON(ctx context.Context, u string, out any) error {
